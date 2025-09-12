@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
       bot: {
         id: bot.id,
         status: bot.status,
-        meeting_url: bot.meeting_url,
+        meeting_url: cleanedUrl, // Use the actual URL string
         created_at: bot.created_at,
       },
       meeting: {
