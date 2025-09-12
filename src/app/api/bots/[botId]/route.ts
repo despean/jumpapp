@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { botId } = params;
+    const { botId } = await params;
 
     if (!botId) {
       return NextResponse.json({ error: 'Bot ID is required' }, { status: 400 });

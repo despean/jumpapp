@@ -92,6 +92,7 @@ function MeetingCard({ event, onToggleNotetaker }: {
           return;
         }
       }
+      console.log('🔍 No existing bot association, calling creation API...');
     }
     
     try {
