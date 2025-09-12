@@ -1,17 +1,48 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function TestAuth() {
   const { data: session, status } = useSession();
   const [testResult, setTestResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const testCalendarAPI = async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/calendar/events?maxResults=5');
+      const data = await response.json();
+      setTestResult(data);
+    } catch (error) {
+      setTestResult({ error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testUserDebug = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/debug/user');
+      const data = await response.json();
+      setTestResult(data);
+    } catch (error) {
+      setTestResult({ error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testScopes = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/debug/scopes');
       const data = await response.json();
       setTestResult(data);
     } catch (error) {
@@ -77,13 +108,29 @@ export default function TestAuth() {
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Calendar API Test
               </h2>
-              <button
-                onClick={testCalendarAPI}
-                disabled={loading}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50"
-              >
-                {loading ? 'Testing...' : 'Test Calendar API'}
-              </button>
+              <div className="space-x-2 space-y-2">
+                <button
+                  onClick={testCalendarAPI}
+                  disabled={loading}
+                  className="bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 text-sm"
+                >
+                  {loading ? 'Testing...' : 'Test Calendar API'}
+                </button>
+                <button
+                  onClick={testUserDebug}
+                  disabled={loading}
+                  className="bg-purple-600 text-white px-3 py-2 rounded-md hover:bg-purple-700 disabled:opacity-50 text-sm"
+                >
+                  {loading ? 'Testing...' : 'Debug User Data'}
+                </button>
+                <button
+                  onClick={testScopes}
+                  disabled={loading}
+                  className="bg-orange-600 text-white px-3 py-2 rounded-md hover:bg-orange-700 disabled:opacity-50 text-sm"
+                >
+                  {loading ? 'Testing...' : 'Check Scopes'}
+                </button>
+              </div>
               
               {testResult && (
                 <div className="mt-4">
@@ -113,8 +160,8 @@ export default function TestAuth() {
               Debug Information
             </h2>
             <div className="bg-gray-50 p-4 rounded-md">
-              <p><strong>Current URL:</strong> {typeof window !== 'undefined' ? window.location.href : 'Server-side'}</p>
-              <p><strong>User Agent:</strong> {typeof navigator !== 'undefined' ? navigator.userAgent : 'Server-side'}</p>
+              <p><strong>Current URL:</strong> {mounted ? window.location.href : 'Loading...'}</p>
+              <p><strong>User Agent:</strong> {mounted ? navigator.userAgent : 'Loading...'}</p>
             </div>
           </div>
 

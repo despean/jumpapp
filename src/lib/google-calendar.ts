@@ -57,9 +57,17 @@ export class GoogleCalendarService {
   }
 
   async getUpcomingEvents(maxResults: number = 10): Promise<CalendarEvent[]> {
+    console.log('🔍 GoogleCalendarService: Starting to fetch events...');
+    console.log('📊 OAuth2Client credentials set:', {
+      hasAccessToken: !!this.oauth2Client.credentials.access_token,
+      hasRefreshToken: !!this.oauth2Client.credentials.refresh_token,
+      expiresAt: this.oauth2Client.credentials.expiry_date
+    });
+
     const calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
 
     try {
+      console.log('📅 Making Calendar API request...');
       const response = await calendar.events.list({
         calendarId: 'primary',
         timeMin: new Date().toISOString(),
@@ -68,13 +76,36 @@ export class GoogleCalendarService {
         orderBy: 'startTime',
       });
 
+      console.log('✅ Calendar API response received:', {
+        statusCode: response.status,
+        itemCount: response.data.items?.length || 0
+      });
+
       const items = response.data.items || [];
-      return items.filter((item): item is CalendarEvent => 
+      const filteredItems = items.filter((item): item is CalendarEvent => 
         item.id != null && item.summary != null
       ) as CalendarEvent[];
+
+      console.log('🎯 Filtered events:', filteredItems.length);
+      return filteredItems;
     } catch (error) {
-      console.error('Error fetching calendar events:', error);
-      throw new Error('Failed to fetch calendar events');
+      console.error('❌ Error in GoogleCalendarService:', error);
+      
+      // More specific error handling
+      if (error.response) {
+        console.error('📄 API Response Error:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        });
+        throw new Error(`Google Calendar API error: ${error.response.status} - ${error.response.statusText}`);
+      } else if (error.request) {
+        console.error('🌐 Network Error:', error.request);
+        throw new Error('Network error connecting to Google Calendar API');
+      } else {
+        console.error('⚙️ Setup Error:', error.message);
+        throw new Error(`Calendar service error: ${error.message}`);
+      }
     }
   }
 
