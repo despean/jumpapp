@@ -191,7 +191,10 @@ export const meetingsRelations = relations(meetings, ({ one, many }) => ({
     fields: [meetings.userId],
     references: [users.id],
   }),
-  transcript: one(transcripts),
+  transcript: one(transcripts, {
+    fields: [meetings.id],
+    references: [transcripts.meetingId],
+  }),
   socialMediaPosts: many(socialMediaPosts),
 }));
 

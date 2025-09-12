@@ -217,10 +217,23 @@ export default function PastMeetingsPage() {
             {data.meetings.length === 0 ? (
               <div className="bg-white rounded-lg shadow p-8 text-center">
                 <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No past meetings</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No past meetings yet</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Your completed meetings will appear here once they finish.
+                  Your completed meetings will appear here once they finish. 
+                  Make sure to add bots to your meetings to get transcripts!
                 </p>
+                <div className="mt-4 space-y-2 text-xs text-gray-400">
+                  <p>💡 Tip: Meetings only appear here after their end time has passed</p>
+                  <p>🤖 Add a bot to your meetings to get automatic transcripts</p>
+                </div>
+                <div className="mt-6">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-600 bg-blue-100 hover:bg-blue-200"
+                  >
+                    View Upcoming Meetings
+                  </Link>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
