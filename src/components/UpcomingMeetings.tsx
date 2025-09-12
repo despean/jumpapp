@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUpcomingMeetings, ProcessedCalendarEvent } from '@/hooks/useCalendarEvents';
 import { 
   CalendarIcon, 
@@ -50,10 +50,50 @@ function MeetingCard({ event, onToggleNotetaker }: {
   onToggleNotetaker: (meetingId: string, enabled: boolean) => void;
 }) {
   const [notetakerEnabled, setNotetakerEnabled] = useState(event.notetakerEnabled || false);
+  const [botStatus, setBotStatus] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleToggle = (enabled: boolean) => {
+  // Check bot status when component mounts if bot exists
+  useEffect(() => {
+    if (event.botId && notetakerEnabled) {
+      checkBotStatus(event.botId);
+    }
+  }, [event.botId, notetakerEnabled]);
+
+  const checkBotStatus = async (botId: string) => {
+    try {
+      const response = await fetch(`/api/bots/${botId}`);
+      const data = await response.json();
+      if (response.ok) {
+        setBotStatus(data.bot.status);
+        return data.bot.status;
+      }
+    } catch (error) {
+      console.error('❌ Error checking bot status:', error);
+    }
+    return null;
+  };
+
+  const handleToggle = async (enabled: boolean) => {
+    setIsLoading(true);
+    
+    if (enabled) {
+      // Check if bot already exists
+      if (event.botId) {
+        console.log('🤖 Bot already exists, checking status...');
+        const status = await checkBotStatus(event.botId);
+        if (status) {
+          setNotetakerEnabled(true);
+          setBotStatus(status);
+          setIsLoading(false);
+          return;
+        }
+      }
+    }
+    
     setNotetakerEnabled(enabled);
-    onToggleNotetaker(event.meetingId, enabled);
+    await onToggleNotetaker(event.meetingId, enabled);
+    setIsLoading(false);
   };
 
   const startTime = event.start.dateTime ? new Date(event.start.dateTime) : null;
@@ -110,22 +150,43 @@ function MeetingCard({ event, onToggleNotetaker }: {
         </div>
 
         <div className="ml-4 flex-shrink-0">
-          <div className="flex items-center">
-            <label className="text-xs text-gray-600 mr-2">AI Notetaker</label>
-            <Switch
-              checked={notetakerEnabled}
-              onChange={handleToggle}
-              className={`${
-                notetakerEnabled ? 'bg-blue-600' : 'bg-gray-200'
-              } relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75`}
-            >
-              <span
-                aria-hidden="true"
+          <div className="flex flex-col items-end">
+            <div className="flex items-center">
+              <label className="text-xs text-gray-600 mr-2">AI Notetaker</label>
+              <Switch
+                checked={notetakerEnabled}
+                onChange={handleToggle}
+                disabled={isLoading}
                 className={`${
-                  notetakerEnabled ? 'translate-x-3' : 'translate-x-0'
-                } pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out`}
-              />
-            </Switch>
+                  notetakerEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                } ${isLoading ? 'opacity-50' : ''} relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`${
+                    notetakerEnabled ? 'translate-x-3' : 'translate-x-0'
+                  } pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out`}
+                />
+              </Switch>
+            </div>
+            {(event.botId || botStatus) && (
+              <div className="mt-1 text-right">
+                <div className="text-xs text-gray-500">
+                  Bot: {event.botId?.substring(0, 8)}...
+                </div>
+                {botStatus && (
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                    botStatus === 'done' ? 'bg-green-100 text-green-800' :
+                    botStatus === 'in_call_recording' ? 'bg-blue-100 text-blue-800' :
+                    botStatus === 'joining_call' ? 'bg-yellow-100 text-yellow-800' :
+                    botStatus === 'error' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {botStatus}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -174,7 +235,13 @@ export function UpcomingMeetings() {
 
         if (response.ok) {
           console.log('✅ Bot created successfully:', result.bot.id);
-          // TODO: Update UI to show bot status
+          // Refetch calendar events to update UI with bot info
+          refetch();
+        } else if (result.error?.includes('Bot already exists')) {
+          console.log('ℹ️ Bot already exists for this meeting:', result.botId);
+          // This is actually fine - the bot is already created
+          // Refetch to update UI with existing bot info
+          refetch();
         } else {
           console.error('❌ Failed to create bot:', result.error);
           console.error('❌ Full response:', result);

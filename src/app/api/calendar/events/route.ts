@@ -186,7 +186,7 @@ export async function GET(request: NextRequest) {
           duration: GoogleCalendarService.getEventDuration(event),
           formattedTime: GoogleCalendarService.formatEventTime(event),
           isStartingSoon: GoogleCalendarService.isEventStartingSoon(event),
-          notetakerEnabled: existingMeeting?.notetakerEnabled || false,
+          notetakerEnabled: existingMeeting?.notetakerEnabled || !!existingMeeting?.botId,
           botId: existingMeeting?.botId || null,
         });
       }
