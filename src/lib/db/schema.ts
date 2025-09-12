@@ -99,10 +99,23 @@ export const meetings = pgTable('meetings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Recall.ai bots - tracked separately from meetings
+export const bots = pgTable('bots', {
+  id: text('id').primaryKey(), // Recall.ai bot ID
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  meetingUrl: text('meeting_url').notNull(),
+  botName: text('bot_name'),
+  status: varchar('status', { length: 50 }), // recall.ai status
+  platform: varchar('platform', { length: 20 }), // 'zoom', 'teams', 'meet'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Meeting transcripts from Recall.ai
 export const transcripts = pgTable('transcripts', {
   id: uuid('id').defaultRandom().primaryKey(),
   meetingId: uuid('meeting_id').references(() => meetings.id, { onDelete: 'cascade' }).notNull(),
+  botId: text('bot_id').references(() => bots.id, { onDelete: 'set null' }),
   content: text('content').notNull(),
   summary: text('summary'),
   attendees: text('attendees'), // JSON string of attendee names
@@ -159,6 +172,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   linkedinAccounts: many(linkedinAccounts),
   facebookAccounts: many(facebookAccounts),
   meetings: many(meetings),
+  bots: many(bots),
   socialMediaPosts: many(socialMediaPosts),
   automations: many(automations),
   settings: one(userSettings),
@@ -181,10 +195,22 @@ export const meetingsRelations = relations(meetings, ({ one, many }) => ({
   socialMediaPosts: many(socialMediaPosts),
 }));
 
+export const botsRelations = relations(bots, ({ one, many }) => ({
+  user: one(users, {
+    fields: [bots.userId],
+    references: [users.id],
+  }),
+  transcripts: many(transcripts),
+}));
+
 export const transcriptsRelations = relations(transcripts, ({ one }) => ({
   meeting: one(meetings, {
     fields: [transcripts.meetingId],
     references: [meetings.id],
+  }),
+  bot: one(bots, {
+    fields: [transcripts.botId],
+    references: [bots.id],
   }),
 }));
 

@@ -53,12 +53,15 @@ function MeetingCard({ event, onToggleNotetaker }: {
   const [botStatus, setBotStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check bot status when component mounts if bot exists
+  // Sync local state with props and check bot status
   useEffect(() => {
-    if (event.botId && notetakerEnabled) {
+    setNotetakerEnabled(!!event.botId); // Sync with actual bot presence
+    if (event.botId) {
       checkBotStatus(event.botId);
+    } else {
+      setBotStatus(null); // Clear status if no bot
     }
-  }, [event.botId, notetakerEnabled]);
+  }, [event.botId]);
 
   const checkBotStatus = async (botId: string) => {
     try {

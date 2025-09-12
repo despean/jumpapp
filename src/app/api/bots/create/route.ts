@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { RecallAIService } from '@/lib/recall-ai';
 import { db } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
-import { meetings, users } from '@/lib/db/schema';
+import { meetings, users, bots } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
   try {
@@ -127,25 +127,73 @@ export async function POST(request: NextRequest) {
       cleaned: cleanedUrl
     });
 
-    // Create the bot
-    const recallService = new RecallAIService();
-    
-    // Prepare bot configuration (following official Recall.ai format)
-    const botConfig = {
-      meeting_url: cleanedUrl,
-      bot_name: `JumpApp Bot - ${meeting.title}`,
-      recording_config: {
-        transcript: {
-          provider: {
-            meeting_captions: {}
-          }
-        }
-      },
-    };
+    // Check if we already have a bot for this meeting URL
+    const existingBot = await db.query.bots.findFirst({
+      where: and(
+        eq(bots.userId, user.id),
+        eq(bots.meetingUrl, cleanedUrl)
+      )
+    });
 
-    console.log('🤖 Final bot configuration:', JSON.stringify(botConfig, null, 2));
-    
-    const bot = await recallService.createBot(botConfig);
+    let bot;
+    const recallService = new RecallAIService();
+
+    if (existingBot) {
+      console.log('🔄 Found existing bot, checking status:', existingBot.id);
+      
+      try {
+        // Get current status from Recall.ai
+        const botStatus = await recallService.getBot(existingBot.id);
+        
+        // Update our database with current status
+        await db.update(bots)
+          .set({
+            status: botStatus.status,
+            updatedAt: new Date(),
+          })
+          .where(eq(bots.id, existingBot.id));
+
+        bot = { id: existingBot.id, ...botStatus };
+        console.log('✅ Reusing existing bot:', existingBot.id, 'Status:', botStatus.status);
+      } catch (error) {
+        console.log('⚠️ Existing bot not found on Recall.ai, creating new one');
+        // Bot doesn't exist on Recall.ai anymore, create a new one
+        existingBot.id = null; // Force creation of new bot
+      }
+    }
+
+    if (!existingBot || !bot) {
+      // Create new bot
+      console.log('🤖 Creating new bot for meeting URL:', cleanedUrl);
+      
+      const botConfig = {
+        meeting_url: cleanedUrl,
+        bot_name: `JumpApp Bot - ${meeting.title}`,
+        recording_config: {
+          transcript: {
+            provider: {
+              meeting_captions: {}
+            }
+          }
+        },
+      };
+
+      console.log('🤖 Final bot configuration:', JSON.stringify(botConfig, null, 2));
+      
+      bot = await recallService.createBot(botConfig);
+
+      // Save the new bot to our database
+      await db.insert(bots).values({
+        id: bot.id,
+        userId: user.id,
+        meetingUrl: cleanedUrl,
+        botName: botConfig.bot_name,
+        status: bot.status,
+        platform: meeting.platform,
+      });
+
+      console.log('💾 New bot saved to database:', bot.id);
+    }
 
     // Update meeting with bot ID
     await db.update(meetings)
