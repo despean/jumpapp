@@ -69,28 +69,52 @@ export class BotPollingService {
     try {
       console.log('🔍 Polling active bots...');
 
-      // Get all meetings with active bots
+      // Get all meetings with active bots (including completed ones without transcripts)
       const activeMeetings = await db.query.meetings.findMany({
         where: and(
           isNotNull(meetings.botId),
-          inArray(meetings.status, ['scheduled', 'in_progress'])
+          inArray(meetings.status, ['scheduled', 'in_progress', 'completed'])
         )
       });
+
+      console.log(`📊 Query found ${activeMeetings.length} meetings with bots:`, 
+        activeMeetings.map(m => ({ id: m.id, title: m.title, status: m.status, botId: m.botId })));
 
       if (activeMeetings.length === 0) {
         console.log('📊 No active bots to poll');
         return;
       }
 
-      console.log(`📊 Found ${activeMeetings.length} meetings with active bots`);
+      // Filter out meetings that already have transcripts
+      const meetingsNeedingPoll = [];
+      for (const meeting of activeMeetings) {
+        if (!meeting.botId) continue;
+        
+        // Check if transcript already exists
+        const existingTranscript = await db.query.transcripts.findFirst({
+          where: eq(transcripts.meetingId, meeting.id)
+        });
+        
+        if (!existingTranscript) {
+          meetingsNeedingPoll.push(meeting);
+        } else {
+          console.log(`📝 Meeting "${meeting.title}" already has transcript, skipping`);
+        }
+      }
+
+      console.log(`📊 Found ${meetingsNeedingPoll.length} meetings needing polling (${activeMeetings.length - meetingsNeedingPoll.length} already have transcripts)`);
+
+      if (meetingsNeedingPoll.length === 0) {
+        console.log('📊 No meetings need polling');
+        return;
+      }
 
       const recallService = new RecallAIService();
       const results = [];
 
-      for (const meeting of activeMeetings) {
-        if (!meeting.botId) continue;
-
+      for (const meeting of meetingsNeedingPoll) {
         try {
+          console.log(`🤖 Polling bot ${meeting.botId} for meeting: "${meeting.title}"`);
           const result = await this.pollSingleBot(recallService, meeting);
           results.push(result);
         } catch (error) {
@@ -124,10 +148,12 @@ export class BotPollingService {
     meeting: any
   ): Promise<{ meetingId: string; botId: string; status: string; transcriptSaved?: boolean }> {
     
-    console.log(`🤖 Polling bot ${meeting.botId} for meeting: ${meeting.title}`);
+    console.log(`🔍 Checking bot ${meeting.botId} status...`);
 
     // Check bot status and transcript availability
     const { isReady, hasTranscript, status } = await recallService.isBotReady(meeting.botId);
+    
+    console.log(`📊 Bot ${meeting.botId} results: status="${status}", isReady=${isReady}, hasTranscript=${hasTranscript}`);
     
     // Update meeting status if bot finished
     if (isReady && meeting.status !== 'completed') {
