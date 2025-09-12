@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { GoogleCalendarService } from '@/lib/google-calendar';
 import { db } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
-import { accounts, users } from '@/lib/db/schema';
+import { accounts, users, meetings } from '@/lib/db/schema';
 
 export async function GET(request: NextRequest) {
   console.log('🚀 Calendar API route called');
