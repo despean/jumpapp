@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/lib/providers";
+import "@/lib/startup"; // Initialize app services
 
 const inter = Inter({
   subsets: ["latin"],

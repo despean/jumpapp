@@ -140,14 +140,8 @@ export class RecallAIService {
           video_mixed_mp4: {},
           // Capture meeting metadata
           meeting_metadata: {},
-          // Add webhook endpoints for real-time updates if configured
-          realtime_endpoints: process.env.RECALL_WEBHOOK_URL ? [
-            {
-              type: "webhook",
-              url: process.env.RECALL_WEBHOOK_URL,
-              events: ["transcript.data", "transcript.partial_data", "bot.status_change"]
-            }
-          ] : [],
+          // Note: Webhooks disabled for shared account - using polling instead
+          // realtime_endpoints: [],
           ...config.recording_config,
         },
         ...config,

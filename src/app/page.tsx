@@ -4,6 +4,7 @@ import { useSession, signIn } from 'next-auth/react';
 import { CalendarIcon, CogIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { UpcomingMeetings } from '@/components/UpcomingMeetings';
+import PollingStatus from '@/components/PollingStatus';
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -129,6 +130,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          <PollingStatus />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Upcoming Meetings */}
             <UpcomingMeetings />
