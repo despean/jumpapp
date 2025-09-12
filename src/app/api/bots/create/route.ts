@@ -71,16 +71,32 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    console.log('📋 Meeting details:', {
+      id: meeting.id,
+      title: meeting.title,
+      meetingUrl: meeting.meetingUrl,
+      platform: meeting.platform,
+      startTime: meeting.startTime
+    });
+
     if (!meeting.meetingUrl) {
+      console.log('❌ No meeting URL found');
       return NextResponse.json({ 
         error: 'Meeting URL not found - cannot create bot' 
       }, { status: 400 });
     }
 
     // Check if meeting URL is supported
-    if (!RecallAIService.isSupportedMeetingUrl(meeting.meetingUrl)) {
+    const isSupported = RecallAIService.isSupportedMeetingUrl(meeting.meetingUrl);
+    console.log('🔍 Meeting URL support check:', {
+      url: meeting.meetingUrl,
+      supported: isSupported
+    });
+    
+    if (!isSupported) {
       return NextResponse.json({ 
-        error: 'Meeting platform not supported by Recall.ai' 
+        error: 'Meeting platform not supported by Recall.ai',
+        meetingUrl: meeting.meetingUrl 
       }, { status: 400 });
     }
 
@@ -104,18 +120,38 @@ export async function POST(request: NextRequest) {
       shouldJoinNow: now >= joinTime
     });
 
+    // Clean the meeting URL for Recall.ai
+    const cleanedUrl = RecallAIService.cleanMeetingUrl(meeting.meetingUrl);
+    console.log('🧹 URL cleaning:', {
+      original: meeting.meetingUrl,
+      cleaned: cleanedUrl
+    });
+
     // Create the bot
     const recallService = new RecallAIService();
     
-    const bot = await recallService.createBot({
-      meeting_url: meeting.meetingUrl,
+    // Prepare bot configuration
+    const botConfig = {
+      meeting_url: cleanedUrl,
       bot_name: `JumpApp Bot - ${meeting.title}`,
       recording_config: {
         participant_events: true,
         transcription: true,
         chat: true,
       },
-    });
+    };
+
+    // Add join_at if the meeting is in the future
+    if (joinTime > now) {
+      botConfig.join_at = joinTime.toISOString();
+      console.log('⏰ Bot scheduled to join at:', joinTime.toISOString());
+    } else {
+      console.log('🚀 Bot will join immediately');
+    }
+    
+    console.log('🤖 Final bot configuration:', JSON.stringify(botConfig, null, 2));
+    
+    const bot = await recallService.createBot(botConfig);
 
     // Update meeting with bot ID
     await db.update(meetings)

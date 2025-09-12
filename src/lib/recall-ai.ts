@@ -23,6 +23,7 @@ export interface RecallBot {
 export interface RecallBotCreate {
   meeting_url: string;
   bot_name?: string;
+  join_at?: string; // ISO timestamp for when bot should join
   recording_config?: {
     participant_events?: boolean;
     transcription?: boolean;
@@ -84,19 +85,24 @@ export class RecallAIService {
     try {
       console.log('🤖 Creating Recall.ai bot for:', config.meeting_url);
       
+      const requestBody = {
+        meeting_url: config.meeting_url,
+        bot_name: config.bot_name || 'JumpApp Meeting Bot',
+        recording_config: {
+          participant_events: true,
+          transcription: true,
+          chat: true,
+          ...config.recording_config,
+        },
+        ...config,
+      };
+      
+      console.log('📤 Recall.ai request body:', JSON.stringify(requestBody, null, 2));
+      console.log('📤 Recall.ai headers:', this.headers);
+      
       const response: AxiosResponse<RecallBot> = await axios.post(
         `${this.baseURL}/bot/`,
-        {
-          meeting_url: config.meeting_url,
-          bot_name: config.bot_name || 'JumpApp Meeting Bot',
-          recording_config: {
-            participant_events: true,
-            transcription: true,
-            chat: true,
-            ...config.recording_config,
-          },
-          ...config,
-        },
+        requestBody,
         { headers: this.headers }
       );
 
@@ -105,7 +111,10 @@ export class RecallAIService {
     } catch (error) {
       console.error('❌ Failed to create bot:', error);
       if (axios.isAxiosError(error)) {
-        const message = error.response?.data?.message || error.message;
+        console.error('❌ Recall.ai error response:', error.response?.data);
+        console.error('❌ Recall.ai error status:', error.response?.status);
+        console.error('❌ Recall.ai error headers:', error.response?.headers);
+        const message = error.response?.data?.message || error.response?.data?.detail || error.message;
         throw new Error(`Recall.ai bot creation failed: ${message}`);
       }
       throw error;
@@ -287,5 +296,40 @@ export class RecallAIService {
     ];
 
     return supportedDomains.some(domain => meetingUrl.includes(domain));
+  }
+
+  /**
+   * Clean and validate a meeting URL for Recall.ai
+   */
+  static cleanMeetingUrl(meetingUrl: string): string {
+    try {
+      const url = new URL(meetingUrl);
+      
+      // For Google Meet, remove unnecessary parameters
+      if (url.hostname === 'meet.google.com') {
+        // Keep only the meeting code path
+        return `https://meet.google.com${url.pathname}`;
+      }
+      
+      // For Zoom, clean up the URL
+      if (url.hostname.includes('zoom.us')) {
+        // Remove tracking parameters but keep essential ones
+        const cleanUrl = new URL(url.origin + url.pathname);
+        if (url.searchParams.has('pwd')) {
+          cleanUrl.searchParams.set('pwd', url.searchParams.get('pwd')!);
+        }
+        return cleanUrl.toString();
+      }
+      
+      // For Teams, keep as is for now
+      if (url.hostname.includes('teams.microsoft.com') || url.hostname.includes('teams.live.com')) {
+        return meetingUrl;
+      }
+      
+      return meetingUrl;
+    } catch (error) {
+      console.warn('⚠️ Could not parse meeting URL, using as-is:', meetingUrl);
+      return meetingUrl;
+    }
   }
 }
