@@ -1,17 +1,49 @@
-import { pgTable, text, timestamp, boolean, integer, uuid, varchar } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, integer, uuid, varchar, primaryKey } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
-// Users table
-export const users = pgTable('users', {
+// Users table (NextAuth.js compatible)
+export const users = pgTable('user', {
   id: uuid('id').defaultRandom().primaryKey(),
-  email: text('email').notNull().unique(),
   name: text('name'),
+  email: text('email').notNull().unique(),
+  emailVerified: timestamp('emailVerified', { mode: 'date' }),
   image: text('image'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Google accounts for calendar integration
+// NextAuth.js required tables
+export const accounts = pgTable('account', {
+  userId: uuid('userId').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  type: text('type').notNull(),
+  provider: text('provider').notNull(),
+  providerAccountId: text('providerAccountId').notNull(),
+  refresh_token: text('refresh_token'),
+  access_token: text('access_token'),
+  expires_at: integer('expires_at'),
+  token_type: text('token_type'),
+  scope: text('scope'),
+  id_token: text('id_token'),
+  session_state: text('session_state'),
+}, (account) => ({
+  compoundKey: primaryKey({
+    columns: [account.provider, account.providerAccountId],
+  }),
+}));
+
+export const sessions = pgTable('session', {
+  sessionToken: text('sessionToken').primaryKey(),
+  userId: uuid('userId').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  expires: timestamp('expires', { mode: 'date' }).notNull(),
+});
+
+export const verificationTokens = pgTable('verificationToken', {
+  identifier: text('identifier').notNull(),
+  token: text('token').notNull(),
+  expires: timestamp('expires', { mode: 'date' }).notNull(),
+}, (vt) => ({
+  compoundKey: primaryKey({ columns: [vt.identifier, vt.token] }),
+}));
+
+// Additional OAuth accounts for extended functionality
 export const googleAccounts = pgTable('google_accounts', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
@@ -121,6 +153,8 @@ export const userSettings = pgTable('user_settings', {
 
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
+  accounts: many(accounts),
+  sessions: many(sessions),
   googleAccounts: many(googleAccounts),
   linkedinAccounts: many(linkedinAccounts),
   facebookAccounts: many(facebookAccounts),
@@ -128,6 +162,14 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   socialMediaPosts: many(socialMediaPosts),
   automations: many(automations),
   settings: one(userSettings),
+}));
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  user: one(users, { fields: [accounts.userId], references: [users.id] }),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
 }));
 
 export const meetingsRelations = relations(meetings, ({ one, many }) => ({
