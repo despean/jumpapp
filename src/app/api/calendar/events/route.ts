@@ -124,15 +124,75 @@ export async function GET(request: NextRequest) {
 
     const events = await calendarService.getUpcomingEvents(maxResults);
 
-    // Process events to add meeting platform detection
-    const processedEvents = events.map(event => ({
-      ...event,
-      meetingPlatform: GoogleCalendarService.detectMeetingPlatform(event),
-      attendeeCount: GoogleCalendarService.getAttendeeCount(event),
-      duration: GoogleCalendarService.getEventDuration(event),
-      formattedTime: GoogleCalendarService.formatEventTime(event),
-      isStartingSoon: GoogleCalendarService.isEventStartingSoon(event)
-    }));
+    // Process events and save/update them in database
+    const processedEvents = [];
+
+    for (const event of events) {
+      const meetingPlatform = GoogleCalendarService.detectMeetingPlatform(event);
+      
+      // Only process events with meeting links
+      if (meetingPlatform) {
+        // Check if meeting already exists in database
+        const existingMeeting = await db.query.meetings.findFirst({
+          where: and(
+            eq(meetings.userId, user.id),
+            eq(meetings.calendarEventId, event.id)
+          )
+        });
+
+        let meetingId = existingMeeting?.id;
+
+        if (!existingMeeting) {
+          // Create new meeting record
+          const [newMeeting] = await db.insert(meetings).values({
+            userId: user.id,
+            calendarEventId: event.id,
+            title: event.summary,
+            description: event.description || null,
+            startTime: new Date(event.start.dateTime || event.start.date),
+            endTime: new Date(event.end.dateTime || event.end.date),
+            platform: meetingPlatform.platform,
+            meetingUrl: meetingPlatform.url,
+            attendeesCount: GoogleCalendarService.getAttendeeCount(event),
+            notetakerEnabled: false, // Default to false
+            status: 'scheduled',
+          }).returning();
+
+          meetingId = newMeeting.id;
+          console.log('📅 New meeting saved:', newMeeting.title);
+        } else {
+          // Update existing meeting
+          await db.update(meetings)
+            .set({
+              title: event.summary,
+              description: event.description || null,
+              startTime: new Date(event.start.dateTime || event.start.date),
+              endTime: new Date(event.end.dateTime || event.end.date),
+              platform: meetingPlatform.platform,
+              meetingUrl: meetingPlatform.url,
+              attendeesCount: GoogleCalendarService.getAttendeeCount(event),
+              updatedAt: new Date(),
+            })
+            .where(eq(meetings.id, existingMeeting.id));
+
+          console.log('📅 Meeting updated:', existingMeeting.title);
+        }
+
+        processedEvents.push({
+          ...event,
+          meetingId, // Add our database meeting ID
+          meetingPlatform,
+          attendeeCount: GoogleCalendarService.getAttendeeCount(event),
+          duration: GoogleCalendarService.getEventDuration(event),
+          formattedTime: GoogleCalendarService.formatEventTime(event),
+          isStartingSoon: GoogleCalendarService.isEventStartingSoon(event),
+          notetakerEnabled: existingMeeting?.notetakerEnabled || false,
+          botId: existingMeeting?.botId || null,
+        });
+      }
+    }
+
+    console.log(`📊 Processed ${processedEvents.length} meetings with video links`);
 
     return NextResponse.json({ events: processedEvents });
     

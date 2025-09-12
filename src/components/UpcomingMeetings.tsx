@@ -47,13 +47,13 @@ function MeetingPlatformIcon({ platform }: { platform: string }) {
 
 function MeetingCard({ event, onToggleNotetaker }: { 
   event: ProcessedCalendarEvent;
-  onToggleNotetaker: (eventId: string, enabled: boolean) => void;
+  onToggleNotetaker: (meetingId: string, enabled: boolean) => void;
 }) {
-  const [notetakerEnabled, setNotetakerEnabled] = useState(false);
+  const [notetakerEnabled, setNotetakerEnabled] = useState(event.notetakerEnabled || false);
 
   const handleToggle = (enabled: boolean) => {
     setNotetakerEnabled(enabled);
-    onToggleNotetaker(event.id, enabled);
+    onToggleNotetaker(event.meetingId, enabled);
   };
 
   const startTime = event.start.dateTime ? new Date(event.start.dateTime) : null;
@@ -152,7 +152,38 @@ export function UpcomingMeetings() {
 
   const handleToggleNotetaker = async (eventId: string, enabled: boolean) => {
     console.log(`Toggle notetaker for event ${eventId}: ${enabled}`);
-    // TODO: Implement API call to save notetaker preference
+    
+    if (enabled) {
+      try {
+        // Create bot for this meeting
+        const response = await fetch('/api/bots/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            meetingId: eventId,
+            joinMinutesBefore: 2, // TODO: Make this configurable
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          console.log('✅ Bot created successfully:', result.bot.id);
+          // TODO: Update UI to show bot status
+        } else {
+          console.error('❌ Failed to create bot:', result.error);
+          // TODO: Show error message to user
+        }
+      } catch (error) {
+        console.error('❌ Error creating bot:', error);
+        // TODO: Show error message to user
+      }
+    } else {
+      // TODO: Implement bot removal/cancellation
+      console.log('🚫 Bot removal not implemented yet');
+    }
   };
 
   const handleConnectCalendar = () => {

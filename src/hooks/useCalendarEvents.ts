@@ -3,6 +3,7 @@ import { useSession } from 'next-auth/react';
 
 export interface ProcessedCalendarEvent {
   id: string;
+  meetingId: string; // Our database meeting ID
   summary: string;
   description?: string;
   start: {
@@ -31,6 +32,8 @@ export interface ProcessedCalendarEvent {
   duration: number;
   formattedTime: string;
   isStartingSoon: boolean;
+  notetakerEnabled: boolean;
+  botId: string | null;
 }
 
 interface CalendarEventsResponse {

@@ -94,6 +94,12 @@ export default function Home() {
                 Test Auth
               </Link>
               <Link
+                href="/test-bots"
+                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Test Bots
+              </Link>
+              <Link
                 href="/settings"
                 className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
               >
