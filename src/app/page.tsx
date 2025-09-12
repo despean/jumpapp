@@ -3,6 +3,7 @@
 import { useSession, signIn } from 'next-auth/react';
 import { CalendarIcon, CogIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { UpcomingMeetings } from '@/components/UpcomingMeetings';
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -112,28 +113,7 @@ export default function Home() {
         <div className="px-4 py-6 sm:px-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Upcoming Meetings */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                  Upcoming Meetings
-                </h3>
-                <div className="text-center py-12">
-                  <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No meetings scheduled</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Connect your Google Calendar to see upcoming meetings.
-                  </p>
-                  <div className="mt-6">
-                    <Link
-                      href="/settings"
-                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Connect Calendar
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <UpcomingMeetings />
 
             {/* Past Meetings */}
             <div className="bg-white overflow-hidden shadow rounded-lg">
