@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
 
         bot = { id: existingBot.id, ...botStatus };
         console.log('✅ Reusing existing bot:', existingBot.id, 'Status:', botStatus.status);
+        console.log('🔄 Bot reuse successful - no duplicate created');
       } catch (error) {
         console.log('⚠️ Existing bot not found on Recall.ai, creating new one');
         // Bot doesn't exist on Recall.ai anymore, create a new one

@@ -247,7 +247,8 @@ export function UpcomingMeetings() {
         console.log('🔍 Bot creation response:', result);
 
         if (response.ok) {
-          console.log('✅ Bot created successfully:', result.bot.id);
+          console.log('✅ Bot associated successfully:', result.bot.id);
+          console.log('ℹ️ Note: This may be a new bot or reused existing bot');
           // Refetch calendar events to update UI with bot info
           refetch();
         } else if (result.error?.includes('Bot already exists')) {
