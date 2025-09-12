@@ -17,6 +17,7 @@ if [ ! -f .env ]; then
     echo "   - NEXTAUTH_SECRET"
     echo "   - GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET"
     echo "   - RECALL_AI_API_KEY (provided: d31eff960b1866d5c7f32cd35e911a7db6127fc4)"
+    echo "   - RECALL_AI_REGION (e.g., us-west-2, us-east-1, eu-central-1, ap-northeast-1)"
     echo "   - LINKEDIN_CLIENT_ID & LINKEDIN_CLIENT_SECRET"
     echo "   - FACEBOOK_CLIENT_ID & FACEBOOK_CLIENT_SECRET"
     echo "   - OPENAI_API_KEY"

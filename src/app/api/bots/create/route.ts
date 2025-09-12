@@ -130,25 +130,19 @@ export async function POST(request: NextRequest) {
     // Create the bot
     const recallService = new RecallAIService();
     
-    // Prepare bot configuration
+    // Prepare bot configuration (following official Recall.ai format)
     const botConfig = {
       meeting_url: cleanedUrl,
       bot_name: `JumpApp Bot - ${meeting.title}`,
       recording_config: {
-        participant_events: true,
-        transcription: true,
-        chat: true,
+        transcript: {
+          provider: {
+            meeting_captions: {}
+          }
+        }
       },
     };
 
-    // Add join_at if the meeting is in the future
-    if (joinTime > now) {
-      botConfig.join_at = joinTime.toISOString();
-      console.log('⏰ Bot scheduled to join at:', joinTime.toISOString());
-    } else {
-      console.log('🚀 Bot will join immediately');
-    }
-    
     console.log('🤖 Final bot configuration:', JSON.stringify(botConfig, null, 2));
     
     const bot = await recallService.createBot(botConfig);

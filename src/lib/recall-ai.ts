@@ -25,12 +25,14 @@ export interface RecallBotCreate {
   bot_name?: string;
   join_at?: string; // ISO timestamp for when bot should join
   recording_config?: {
-    participant_events?: boolean;
-    transcription?: boolean;
-    chat?: boolean;
-  };
-  real_time_transcription?: {
-    destination_url?: string;
+    transcript?: {
+      provider: {
+        meeting_captions: Record<string, any>;
+      };
+    };
+    participant_events?: Record<string, any>;
+    video_mixed_mp4?: Record<string, any>;
+    meeting_metadata?: Record<string, any>;
   };
 }
 
@@ -62,13 +64,23 @@ export interface RecallMedia {
 
 export class RecallAIService {
   private apiKey: string;
-  private baseURL: string = 'https://api.recall.ai/api/v1';
+  private region: string;
+  private baseURL: string;
 
-  constructor(apiKey?: string) {
+  constructor(apiKey?: string, region?: string) {
     this.apiKey = apiKey || process.env.RECALL_AI_API_KEY || '';
+    this.region = region || process.env.RECALL_AI_REGION || 'us-west-2'; // Default to us-west-2
+    this.baseURL = `https://${this.region}.recall.ai/api/v1`;
+    
     if (!this.apiKey) {
       throw new Error('Recall.ai API key is required');
     }
+    
+    console.log('🌍 Recall.ai service initialized:', {
+      region: this.region,
+      baseURL: this.baseURL,
+      hasApiKey: !!this.apiKey
+    });
   }
 
   private get headers() {
@@ -89,9 +101,14 @@ export class RecallAIService {
         meeting_url: config.meeting_url,
         bot_name: config.bot_name || 'JumpApp Meeting Bot',
         recording_config: {
-          participant_events: true,
-          transcription: true,
-          chat: true,
+          transcript: {
+            provider: {
+              meeting_captions: {}
+            }
+          },
+          participant_events: {},
+          video_mixed_mp4: {},
+          meeting_metadata: {},
           ...config.recording_config,
         },
         ...config,
