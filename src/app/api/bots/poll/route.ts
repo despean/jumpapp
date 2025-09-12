@@ -50,15 +50,27 @@ export async function POST(request: NextRequest) {
         let transcriptSaved = false;
 
         // Check if bot finished and transcript is available
-        if (bot.status === 'call_ended') {
-          console.log(`✅ Bot ${meeting.botId} finished, checking for transcript...`);
+        const { isReady, hasTranscript, status } = await recallService.isBotReady(meeting.botId);
+        
+        if (isReady) {
+          console.log(`✅ Bot ${meeting.botId} finished with status: ${status}`);
+
+          // Update meeting status if it changed
+          if (meeting.status !== 'completed') {
+            await db.update(meetings)
+              .set({
+                status: 'completed',
+                updatedAt: new Date()
+              })
+              .where(eq(meetings.id, meeting.id));
+          }
 
           // Check if we already have transcript
           const existingTranscript = await db.query.transcripts.findFirst({
             where: eq(transcripts.meetingId, meeting.id)
           });
 
-          if (!existingTranscript) {
+          if (!existingTranscript && hasTranscript) {
             // Try to get transcript from Recall.ai
             try {
               const recallTranscript = await recallService.getBotTranscript(meeting.botId);

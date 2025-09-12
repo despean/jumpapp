@@ -69,12 +69,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         processedAt: existingTranscript.processedAt,
       };
       hasTranscript = true;
-    } else if (bot.status === 'call_ended') {
-      // Bot finished, try to get transcript from Recall.ai
-      console.log('🔍 Bot finished, checking for transcript...');
+    } else {
+      // Check if bot has finished and transcript is available
+      const { isReady, hasTranscript: transcriptReady } = await recallService.isBotReady(botId);
       
-      try {
-        const recallTranscript = await recallService.getBotTranscript(botId);
+      if (isReady && transcriptReady) {
+        console.log('🔍 Bot finished, checking for transcript...');
+        
+        try {
+          const recallTranscript = await recallService.getBotTranscript(botId);
         
         if (recallTranscript) {
           console.log('✅ Transcript found, saving to database...');
