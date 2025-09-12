@@ -69,7 +69,7 @@ export class RecallAIService {
 
   constructor(apiKey?: string, region?: string) {
     this.apiKey = apiKey || process.env.RECALL_AI_API_KEY || '';
-    this.region = region || process.env.RECALL_AI_REGION || 'us-west-2'; // Default to us-west-2
+    this.region = region || process.env.RECALL_AI_REGION || 'us-east-1'; // Default to us-west-2
     this.baseURL = `https://${this.region}.recall.ai/api/v1`;
     
     if (!this.apiKey) {
@@ -181,17 +181,44 @@ export class RecallAIService {
   }
 
   /**
-   * Get transcript for a bot
+   * Get transcript for a bot (using new response format from documentation)
    */
   async getBotTranscript(botId: string): Promise<RecallTranscript | null> {
     try {
-      const response: AxiosResponse<{ results: RecallTranscript[] }> = await axios.get(
-        `${this.baseURL}/bot/${botId}/transcript/`,
+      // Get the full bot data which includes recordings
+      const response: AxiosResponse<RecallBot & { recordings?: any[] }> = await axios.get(
+        `${this.baseURL}/bot/${botId}`,
         { headers: this.headers }
       );
 
-      // Return the first (and usually only) transcript
-      return response.data.results[0] || null;
+      // Check if there are recordings with transcript data
+      const recordings = response.data.recordings;
+      if (!recordings || recordings.length === 0) {
+        console.log(`📝 No recordings found for bot ${botId}`);
+        return null;
+      }
+
+      // Look for transcript in media_shortcuts
+      const recording = recordings[0];
+      const transcriptData = recording?.media_shortcuts?.transcript;
+      
+      if (!transcriptData?.data?.download_url) {
+        console.log(`📝 Transcript not ready for bot ${botId}`);
+        return null;
+      }
+
+      // Fetch the actual transcript content
+      const transcriptResponse = await axios.get(transcriptData.data.download_url);
+      
+      // Return in our expected format
+      return {
+        id: recording.id,
+        bot_id: botId,
+        transcript_text: transcriptResponse.data,
+        words: [], // Would need to parse if available
+        speakers: [], // Would need to parse if available
+        created_at: recording.created_at || new Date().toISOString(),
+      };
     } catch (error) {
       console.error(`❌ Failed to get transcript for bot ${botId}:`, error);
       if (axios.isAxiosError(error) && error.response?.status === 404) {
@@ -229,7 +256,8 @@ export class RecallAIService {
   async isBotReady(botId: string): Promise<boolean> {
     try {
       const bot = await this.getBot(botId);
-      return bot.status === 'call_ended';
+      // According to documentation, status changes to 'done' when ready
+      return bot.status === 'done' || bot.status === 'call_ended';
     } catch (error) {
       console.error(`❌ Failed to check if bot ${botId} is ready:`, error);
       return false;
@@ -255,7 +283,7 @@ export class RecallAIService {
         const bot = await this.getBot(botId);
         console.log(`📊 Bot ${botId} status: ${bot.status} (attempt ${attempts + 1}/${maxAttempts})`);
 
-        if (bot.status === 'call_ended') {
+        if (bot.status === 'done' || bot.status === 'call_ended') {
           // Bot finished, try to get transcript
           const transcript = await this.getBotTranscript(botId);
           if (transcript) {
