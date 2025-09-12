@@ -128,12 +128,29 @@ export async function POST(request: NextRequest) {
     });
 
     // Check if we already have a bot for this meeting URL
+    console.log('🔍 Searching for existing bot:', {
+      userId: user.id,
+      cleanedUrl: cleanedUrl
+    });
+
     const existingBot = await db.query.bots.findFirst({
       where: and(
         eq(bots.userId, user.id),
         eq(bots.meetingUrl, cleanedUrl)
       )
     });
+
+    console.log('🔍 Existing bot search result:', existingBot);
+
+    // Also check all bots for this user to see what we have
+    const allUserBots = await db.query.bots.findMany({
+      where: eq(bots.userId, user.id)
+    });
+    console.log('📋 All user bots:', allUserBots.map(b => ({
+      id: b.id,
+      meetingUrl: b.meetingUrl,
+      status: b.status
+    })));
 
     let bot;
     const recallService = new RecallAIService();
@@ -183,16 +200,20 @@ export async function POST(request: NextRequest) {
       bot = await recallService.createBot(botConfig);
 
       // Save the new bot to our database
-      await db.insert(bots).values({
+      const botData = {
         id: bot.id,
         userId: user.id,
         meetingUrl: cleanedUrl,
         botName: botConfig.bot_name,
         status: bot.status,
         platform: meeting.platform,
-      });
+      };
 
-      console.log('💾 New bot saved to database:', bot.id);
+      console.log('💾 Saving bot to database:', botData);
+      
+      await db.insert(bots).values(botData);
+
+      console.log('✅ New bot saved to database:', bot.id);
     }
 
     // Update meeting with bot ID
