@@ -157,7 +157,7 @@ export class RecallAIService {
       console.log('📤 Recall.ai headers:', this.headers);
       
       const response: AxiosResponse<RecallBot> = await axios.post(
-        `${this.baseURL}/bot/`,
+        `${this.baseURL}/bot`,
         requestBody,
         { headers: this.headers }
       );
@@ -183,7 +183,7 @@ export class RecallAIService {
   async getBot(botId: string): Promise<RecallBot> {
     try {
       const response: AxiosResponse<RecallBot> = await axios.get(
-        `${this.baseURL}/bot/${botId}/`,
+        `${this.baseURL}/bot/${botId}`,
         { headers: this.headers }
       );
 
@@ -204,7 +204,7 @@ export class RecallAIService {
   async listBots(): Promise<{ results: RecallBot[] }> {
     try {
       const response = await axios.get(
-        `${this.baseURL}/bot/`,
+        `${this.baseURL}/bot`,
         { headers: this.headers }
       );
 
@@ -229,7 +229,7 @@ export class RecallAIService {
       console.warn('⚠️ This will permanently delete the bot from Recall.ai!');
       
       const response = await axios.delete(
-        `${this.baseURL}/bot/${botId}/`,
+        `${this.baseURL}/bot/${botId}`,
         { headers: this.headers }
       );
 
@@ -263,7 +263,7 @@ export class RecallAIService {
       
       // First, get the bot data which includes recordings
       const botResponse: AxiosResponse<RecallBot> = await axios.get(
-        `${this.baseURL}/bot/${botId}/`,
+        `${this.baseURL}/bot/${botId}`,
         { headers: this.headers }
       );
 
