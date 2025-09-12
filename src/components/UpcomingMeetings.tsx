@@ -93,12 +93,13 @@ function MeetingCard({ event, onToggleNotetaker }: {
     
     try {
       await onToggleNotetaker(event.meetingId, enabled);
-      // Only update local state if the API call succeeds
-      // The refetch in onToggleNotetaker will update the data
+      // Success - the refetch in onToggleNotetaker will update the data
+      // Keep the current toggle state until refetch completes
     } catch (error) {
       console.error('❌ Toggle failed:', error);
       // Revert the toggle state on error
       setNotetakerEnabled(!enabled);
+      // TODO: Show error message to user
     } finally {
       setIsLoading(false);
     }
@@ -222,8 +223,8 @@ export function UpcomingMeetings() {
   const handleToggleNotetaker = async (meetingId: string, enabled: boolean) => {
     console.log(`Toggle notetaker for meeting ${meetingId}: ${enabled}`);
     
-    if (enabled) {
-      try {
+    try {
+      if (enabled) {
         console.log('🤖 Creating bot for meeting ID:', meetingId);
         
         // Create bot for this meeting
@@ -253,19 +254,15 @@ export function UpcomingMeetings() {
         } else {
           console.error('❌ Failed to create bot:', result.error);
           console.error('❌ Full response:', result);
-          // TODO: Show error message to user
+          throw new Error(result.error || 'Failed to create bot');
         }
-      } catch (error) {
-        console.error('❌ Error creating bot:', error);
-        // TODO: Show error message to user
-      }
-    } else {
-      // Handle bot removal
-      if (event.botId) {
-        try {
+      } else {
+        // Handle bot removal
+        const meetingData = data?.events.find(e => e.meetingId === meetingId);
+        if (meetingData?.botId) {
           console.log('🔄 Removing bot tracking for meeting:', meetingId);
           
-          const response = await fetch(`/api/bots/${event.botId}/remove`, {
+          const response = await fetch(`/api/bots/${meetingData.botId}/remove`, {
             method: 'DELETE',
           });
 
@@ -278,17 +275,17 @@ export function UpcomingMeetings() {
             refetch();
           } else {
             console.error('❌ Failed to remove bot:', result.error);
-            // TODO: Show error message to user
+            throw new Error(result.error || 'Failed to remove bot');
           }
-        } catch (error) {
-          console.error('❌ Error removing bot:', error);
-          // TODO: Show error message to user
+        } else {
+          console.log('ℹ️ No bot to remove for this meeting');
+          // No bot exists, just refetch to update UI state
+          refetch();
         }
-      } else {
-        console.log('ℹ️ No bot to remove for this meeting');
-        // Just disable the toggle
-        setNotetakerEnabled(false);
       }
+    } catch (error) {
+      console.error('❌ Error in handleToggleNotetaker:', error);
+      throw error; // Re-throw so the MeetingCard can handle it
     }
   };
 
