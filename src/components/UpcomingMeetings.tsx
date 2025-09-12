@@ -91,9 +91,17 @@ function MeetingCard({ event, onToggleNotetaker }: {
       }
     }
     
-    setNotetakerEnabled(enabled);
-    await onToggleNotetaker(event.meetingId, enabled);
-    setIsLoading(false);
+    try {
+      await onToggleNotetaker(event.meetingId, enabled);
+      // Only update local state if the API call succeeds
+      // The refetch in onToggleNotetaker will update the data
+    } catch (error) {
+      console.error('❌ Toggle failed:', error);
+      // Revert the toggle state on error
+      setNotetakerEnabled(!enabled);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const startTime = event.start.dateTime ? new Date(event.start.dateTime) : null;
@@ -252,8 +260,35 @@ export function UpcomingMeetings() {
         // TODO: Show error message to user
       }
     } else {
-      // TODO: Implement bot removal/cancellation
-      console.log('🚫 Bot removal not implemented yet');
+      // Handle bot removal
+      if (event.botId) {
+        try {
+          console.log('🔄 Removing bot tracking for meeting:', meetingId);
+          
+          const response = await fetch(`/api/bots/${event.botId}/remove`, {
+            method: 'DELETE',
+          });
+
+          const result = await response.json();
+          console.log('🔍 Bot removal response:', result);
+
+          if (response.ok) {
+            console.log('✅ Bot tracking removed successfully');
+            // Refetch calendar events to update UI
+            refetch();
+          } else {
+            console.error('❌ Failed to remove bot:', result.error);
+            // TODO: Show error message to user
+          }
+        } catch (error) {
+          console.error('❌ Error removing bot:', error);
+          // TODO: Show error message to user
+        }
+      } else {
+        console.log('ℹ️ No bot to remove for this meeting');
+        // Just disable the toggle
+        setNotetakerEnabled(false);
+      }
     }
   };
 

@@ -181,6 +181,41 @@ export class RecallAIService {
   }
 
   /**
+   * Delete/cancel a bot from Recall.ai (use with caution - this actually deletes the bot)
+   * Note: We typically don't use this in the app, we just remove tracking instead
+   */
+  async deleteBot(botId: string): Promise<boolean> {
+    try {
+      console.log('🗑️ Deleting bot from Recall.ai:', botId);
+      console.warn('⚠️ This will permanently delete the bot from Recall.ai!');
+      
+      const response = await axios.delete(
+        `${this.baseURL}/bot/${botId}/`,
+        { headers: this.headers }
+      );
+
+      console.log('✅ Bot deleted from Recall.ai:', botId);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to delete bot from Recall.ai:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Delete error response:', error.response?.data);
+        console.error('❌ Delete error status:', error.response?.status);
+        
+        // Some bots might not be deletable (e.g., already finished)
+        if (error.response?.status === 404) {
+          console.log('ℹ️ Bot not found on Recall.ai (might already be deleted)');
+          return true; // Consider it deleted
+        }
+        
+        const message = error.response?.data?.message || error.response?.data?.detail || error.message;
+        throw new Error(`Failed to delete bot from Recall.ai: ${message}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Get transcript for a bot (using new response format from documentation)
    */
   async getBotTranscript(botId: string): Promise<RecallTranscript | null> {
