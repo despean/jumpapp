@@ -150,11 +150,13 @@ function MeetingCard({ event, onToggleNotetaker }: {
 export function UpcomingMeetings() {
   const { data, isLoading, error, refetch } = useUpcomingMeetings();
 
-  const handleToggleNotetaker = async (eventId: string, enabled: boolean) => {
-    console.log(`Toggle notetaker for event ${eventId}: ${enabled}`);
+  const handleToggleNotetaker = async (meetingId: string, enabled: boolean) => {
+    console.log(`Toggle notetaker for meeting ${meetingId}: ${enabled}`);
     
     if (enabled) {
       try {
+        console.log('🤖 Creating bot for meeting ID:', meetingId);
+        
         // Create bot for this meeting
         const response = await fetch('/api/bots/create', {
           method: 'POST',
@@ -162,18 +164,20 @@ export function UpcomingMeetings() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            meetingId: eventId,
+            meetingId: meetingId,
             joinMinutesBefore: 2, // TODO: Make this configurable
           }),
         });
 
         const result = await response.json();
+        console.log('🔍 Bot creation response:', result);
 
         if (response.ok) {
           console.log('✅ Bot created successfully:', result.bot.id);
           // TODO: Update UI to show bot status
         } else {
           console.error('❌ Failed to create bot:', result.error);
+          console.error('❌ Full response:', result);
           // TODO: Show error message to user
         }
       } catch (error) {

@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { meetingId, joinMinutesBefore = 2 } = body;
 
+    console.log('🤖 Bot creation request:', { meetingId, joinMinutesBefore });
+
     if (!meetingId) {
       return NextResponse.json({ error: 'Meeting ID is required' }, { status: 400 });
     }
@@ -27,8 +29,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
+      console.log('❌ User not found for email:', session.user.email);
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+
+    console.log('👤 User found:', user.id);
 
     // Get meeting from database
     const meeting = await db.query.meetings.findFirst({
@@ -38,8 +43,32 @@ export async function POST(request: NextRequest) {
       )
     });
 
+    console.log('📅 Meeting lookup:', { meetingId, userId: user.id, found: !!meeting });
+
     if (!meeting) {
-      return NextResponse.json({ error: 'Meeting not found' }, { status: 404 });
+      // Let's also check if the meetingId exists at all
+      const anyMeeting = await db.query.meetings.findFirst({
+        where: eq(meetings.id, meetingId)
+      });
+      
+      console.log('🔍 Meeting exists anywhere:', !!anyMeeting);
+      if (anyMeeting) {
+        console.log('📋 Meeting details:', {
+          id: anyMeeting.id,
+          userId: anyMeeting.userId,
+          title: anyMeeting.title,
+          requestedUserId: user.id
+        });
+      }
+      
+      return NextResponse.json({ 
+        error: 'Meeting not found',
+        debug: {
+          meetingId,
+          userId: user.id,
+          meetingExists: !!anyMeeting
+        }
+      }, { status: 404 });
     }
 
     if (!meeting.meetingUrl) {
