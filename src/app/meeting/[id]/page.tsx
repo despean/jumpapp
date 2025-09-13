@@ -12,6 +12,7 @@ import {
   ShareIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
+import Layout from '@/components/Layout';
 import { PlatformLogo } from '@/components/PlatformLogos';
 import Link from 'next/link';
 
@@ -52,6 +53,8 @@ export default function MeetingDetailPage() {
   const [aiLoading, setAiLoading] = useState<{[key: string]: boolean}>({});
   const [aiErrors, setAiErrors] = useState<{[key: string]: string}>({});
   const [postingLoading, setPostingLoading] = useState<{[key: string]: boolean}>({});
+  const [automations, setAutomations] = useState<any[]>([]);
+  const [selectedAutomation, setSelectedAutomation] = useState<string>('');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -61,6 +64,7 @@ export default function MeetingDetailPage() {
 
     if (status === 'authenticated' && params.id) {
       fetchMeetingDetails();
+      fetchAutomations();
     }
   }, [status, params.id, router]);
 
@@ -166,6 +170,55 @@ export default function MeetingDetailPage() {
       setAiErrors(prev => ({ ...prev, summary: 'Failed to generate summary' }));
     } finally {
       setAiLoading(prev => ({ ...prev, summary: false }));
+    }
+  };
+
+  const fetchAutomations = async () => {
+    try {
+      const response = await fetch('/api/automations');
+      if (response.ok) {
+        const data = await response.json();
+        setAutomations(data.filter((a: any) => a.enabled));
+      }
+    } catch (error) {
+      console.error('Error fetching automations:', error);
+    }
+  };
+
+  const generateWithAutomation = async () => {
+    if (!selectedAutomation) {
+      alert('Please select an automation first');
+      return;
+    }
+
+    setAiLoading(prev => ({ ...prev, automation: true }));
+    setAiErrors(prev => ({ ...prev, automation: '' }));
+    
+    try {
+      const response = await fetch('/api/ai/generate-with-automation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          meetingId: params.id,
+          automationId: selectedAutomation,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Add the generated post to the existing posts
+        setAiSocialPosts(prev => [...prev, data.post]);
+        alert(`Post generated successfully using "${data.automation.name}" automation!`);
+      } else {
+        setAiErrors(prev => ({ ...prev, automation: data.error || 'Failed to generate post' }));
+      }
+    } catch (err) {
+      setAiErrors(prev => ({ ...prev, automation: 'Failed to generate post with automation' }));
+    } finally {
+      setAiLoading(prev => ({ ...prev, automation: false }));
     }
   };
 
@@ -283,7 +336,7 @@ export default function MeetingDetailPage() {
           <div className="text-center">
             <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-lg font-medium text-gray-900">Meeting not found</h3>
-            <p className="mt-1 text-sm text-gray-500">The meeting you're looking for doesn't exist.</p>
+            <p className="mt-1 text-sm text-gray-500">{"The meeting you're looking for doesn't exist."}</p>
             <div className="mt-6">
               <Link
                 href="/"
@@ -302,12 +355,13 @@ export default function MeetingDetailPage() {
   const attendees = parseAttendees(meeting.transcript?.attendees || meeting.attendees);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-6">
-            <div className="flex items-center space-x-4">
+    <Layout>
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="bg-white shadow rounded-lg mb-6">
+          <div className="px-4 sm:px-6 lg:px-8">
+            <div className="py-6">
+              <div className="flex items-center space-x-4">
               <Link
                 href="/"
                 className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-700"
@@ -315,6 +369,7 @@ export default function MeetingDetailPage() {
                 <ArrowLeftIcon className="h-4 w-4 mr-2" />
                 Back to Dashboard
               </Link>
+              </div>
             </div>
             
             <div className="mt-4 flex items-center space-x-4">
@@ -345,9 +400,9 @@ export default function MeetingDetailPage() {
             </div>
           </div>
         </div>
-      </div>
+        </div>
 
-      {/* Navigation Tabs */}
+        {/* Navigation Tabs */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8" aria-label="Tabs">
@@ -510,7 +565,7 @@ export default function MeetingDetailPage() {
                       <EnvelopeIcon className="mx-auto h-12 w-12 text-gray-400" />
                       <h3 className="mt-2 text-lg font-medium text-gray-900">Ready to Generate Email</h3>
                       <p className="mt-1 text-sm text-gray-500">
-                        Click "Generate Email" to create an AI-powered follow-up email based on your meeting transcript.
+                        {'Click "Generate Email" to create an AI-powered follow-up email based on your meeting transcript.'}
                       </p>
                     </div>
                   )}
@@ -561,13 +616,39 @@ export default function MeetingDetailPage() {
                   </div>
                 </div>
                 {meeting?.transcript?.content && (
-                  <button
-                    onClick={generateAISocialPosts}
-                    disabled={aiLoading.social}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    {aiLoading.social ? 'Generating...' : 'Generate Posts'}
-                  </button>
+                  <div className="flex flex-col space-y-2">
+                    <button
+                      onClick={generateAISocialPosts}
+                      disabled={aiLoading.social}
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {aiLoading.social ? 'Generating...' : 'Generate Posts'}
+                    </button>
+                    
+                    {automations.length > 0 && (
+                      <div className="flex items-center space-x-2">
+                        <select
+                          value={selectedAutomation}
+                          onChange={(e) => setSelectedAutomation(e.target.value)}
+                          className="block px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                          <option value="">Select automation...</option>
+                          {automations.map((automation) => (
+                            <option key={automation.id} value={automation.id}>
+                              {automation.name} ({automation.platform})
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={generateWithAutomation}
+                          disabled={aiLoading.automation || !selectedAutomation}
+                          className="inline-flex items-center px-2 py-1 border border-gray-300 text-xs font-medium rounded shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                        >
+                          {aiLoading.automation ? 'Generating...' : 'Use Automation'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -582,6 +663,22 @@ export default function MeetingDetailPage() {
                     <h3 className="text-sm font-medium text-red-800">Error</h3>
                     <div className="mt-2 text-sm text-red-700">
                       <p>{aiErrors.social}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {aiErrors.automation && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <DocumentTextIcon className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">Automation Error</h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <p>{aiErrors.automation}</p>
                     </div>
                   </div>
                 </div>
@@ -609,7 +706,7 @@ export default function MeetingDetailPage() {
                 <ShareIcon className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-lg font-medium text-gray-900">Ready to Generate Posts</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Click "Generate Posts" to create AI-powered social media content for LinkedIn and Facebook.
+                  {'Click "Generate Posts" to create AI-powered social media content for LinkedIn and Facebook.'}
                 </p>
               </div>
             )}
@@ -663,7 +760,7 @@ export default function MeetingDetailPage() {
                     <p className="text-sm text-gray-900 whitespace-pre-wrap">{post.content}</p>
                     {post.hashtags && post.hashtags.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-1">
-                        {post.hashtags.map((hashtag, hashIndex) => (
+                        {post.hashtags.map((hashtag: string, hashIndex: number) => (
                           <span key={hashIndex} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
                             {hashtag}
                           </span>
@@ -696,6 +793,6 @@ export default function MeetingDetailPage() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }

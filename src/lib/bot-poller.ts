@@ -9,6 +9,7 @@ import { RecallAIService } from './recall-ai';
 import { db } from './db';
 import { eq, and, isNotNull, inArray } from 'drizzle-orm';
 import { meetings, transcripts } from './db/schema';
+import { logger } from '@/lib/logger';
 
 export class BotPollingService {
   private static instance: BotPollingService;
@@ -31,11 +32,11 @@ export class BotPollingService {
    */
   start(): void {
     if (this.polling) {
-      console.log('📊 Bot polling service already running');
+      logger.info('Bot polling service already running', 'BOT_POLLER');
       return;
     }
 
-    console.log('🚀 Starting bot polling service...');
+    logger.info('Starting bot polling service', 'BOT_POLLER');
     this.polling = true;
     
     // Poll immediately, then every 30 seconds
@@ -53,7 +54,7 @@ export class BotPollingService {
       return;
     }
 
-    console.log('🛑 Stopping bot polling service...');
+    logger.info('Stopping bot polling service', 'BOT_POLLER');
     this.polling = false;
     
     if (this.pollInterval) {
@@ -108,7 +109,7 @@ export class BotPollingService {
           const result = await this.pollSingleBot(recallService, meeting as { id: string; botId: string; status: string; title: string });
           results.push(result);
         } catch (error) {
-          console.error(`❌ Error polling bot ${meeting.botId}:`, error);
+          logger.error(`❌ Error polling bot ${meeting.botId}:`, error);
           results.push({
             meetingId: meeting.id,
             botId: meeting.botId,
@@ -119,7 +120,7 @@ export class BotPollingService {
       }
 
     } catch (error) {
-      console.error('❌ Error in bot polling service:', error);
+      logger.error('❌ Error in bot polling service:', error);
     }
   }
 
@@ -189,7 +190,7 @@ export class BotPollingService {
             };
           }
         } catch (error) {
-          console.error(`❌ Error saving transcript for bot ${meeting.botId}:`, error);
+          logger.error(`❌ Error saving transcript for bot ${meeting.botId}:`, error);
         }
       }
     }
@@ -226,7 +227,7 @@ export class BotPollingService {
    * Force a single poll cycle (for testing/manual triggers)
    */
   async forcePoll(): Promise<void> {
-    console.log('🔄 Force polling all active bots...');
+    logger.info('🔄 Force polling all active bots...');
     await this.pollActiveBots();
   }
 }

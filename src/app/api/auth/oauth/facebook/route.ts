@@ -12,9 +12,10 @@ export async function GET(request: NextRequest) {
 
     // Check if Facebook OAuth is configured
     const clientId = process.env.FACEBOOK_CLIENT_ID;
+    const clientSecret = process.env.FACEBOOK_CLIENT_SECRET;
     const redirectUri = process.env.FACEBOOK_REDIRECT_URI || `${process.env.NEXTAUTH_URL}/api/auth/oauth/facebook/callback`;
 
-    if (!clientId) {
+    if (!clientId || !clientSecret) {
       return NextResponse.redirect(new URL('/settings?error=facebook_not_configured', request.url));
     }
 

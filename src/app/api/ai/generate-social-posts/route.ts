@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { meetings, users } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { aiService, MeetingContext } from '@/lib/ai-service';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error generating social media posts:', error);
+    logger.error('Error generating social media posts:', error);
     return NextResponse.json(
       { error: 'Failed to generate social media posts' },
       { status: 500 }

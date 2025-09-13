@@ -12,9 +12,10 @@ export async function GET(request: NextRequest) {
 
     // Check if LinkedIn OAuth is configured
     const clientId = process.env.LINKEDIN_CLIENT_ID;
+    const clientSecret = process.env.LINKEDIN_CLIENT_SECRET;
     const redirectUri = process.env.LINKEDIN_REDIRECT_URI || `${process.env.NEXTAUTH_URL}/api/auth/oauth/linkedin/callback`;
 
-    if (!clientId) {
+    if (!clientId || !clientSecret) {
       return NextResponse.redirect(new URL('/settings?error=linkedin_not_configured', request.url));
     }
 

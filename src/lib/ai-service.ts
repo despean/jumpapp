@@ -98,6 +98,63 @@ export class AIContentService {
   }
 
   /**
+   * Generate social media post using custom automation template
+   */
+  async generatePostWithAutomation(
+    context: MeetingContext, 
+    automation: { platform: 'linkedin' | 'facebook'; template: string; name: string }
+  ): Promise<GeneratedSocialPost> {
+    try {
+      // Build context for the template
+      const templateContext = `
+Meeting Title: ${context.title}
+Meeting Duration: ${context.duration} minutes
+Key Participants: ${context.attendees?.join(', ') || 'Not specified'}
+
+Meeting Transcript (first 1000 characters):
+${context.transcript.substring(0, 1000)}${context.transcript.length > 1000 ? '...' : ''}
+
+Meeting Summary: ${context.summary || 'Not available'}
+`;
+
+      const prompt = `${automation.template}
+
+Meeting Context:
+${templateContext}
+
+Generate the content now:`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert content creator specializing in ${automation.platform} posts. Follow the template instructions precisely and create engaging, professional content.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      });
+
+      const content = completion.choices[0]?.message?.content || '';
+      
+      return {
+        platform: automation.platform,
+        content: content,
+        hashtags: this.extractHashtags(content),
+        engagement_hook: this.extractEngagementHook(content)
+      };
+    } catch (error) {
+      console.error(`Error generating ${automation.platform} post with automation:`, error);
+      throw new Error(`Failed to generate ${automation.platform} post with automation`);
+    }
+  }
+
+  /**
    * Generate meeting summary with key insights
    */
   async generateMeetingSummary(context: MeetingContext): Promise<MeetingSummary> {

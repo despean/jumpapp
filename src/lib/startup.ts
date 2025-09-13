@@ -5,6 +5,7 @@
  */
 
 import { botPollingService } from './bot-poller';
+import { logger } from '@/lib/logger';
 
 let initialized = false;
 
@@ -13,18 +14,18 @@ export function initializeApp(): void {
     return;
   }
 
-  console.log('🚀 Initializing JumpApp services...');
+  logger.info('🚀 Initializing JumpApp services...');
 
   // Start the bot polling service for shared Recall.ai account
   try {
     botPollingService.start();
-    console.log('✅ Bot polling service initialized');
+    logger.info('✅ Bot polling service initialized');
   } catch (error) {
-    console.error('❌ Failed to initialize bot polling service:', error);
+    logger.error('❌ Failed to initialize bot polling service:', error);
   }
 
   initialized = true;
-  console.log('✅ JumpApp initialization complete');
+  logger.info('✅ JumpApp initialization complete');
 }
 
 // Auto-initialize in server environment

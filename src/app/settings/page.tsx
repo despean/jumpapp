@@ -11,6 +11,7 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
+import Layout from '@/components/Layout';
 
 interface UserSettings {
   botJoinMinutes: number;
@@ -41,6 +42,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState<{[key: string]: boolean}>({});
+  const [oauthStatus, setOauthStatus] = useState<{linkedin: boolean; facebook: boolean}>({
+    linkedin: false,
+    facebook: false
+  });
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -51,6 +56,7 @@ export default function SettingsPage() {
     if (status === 'authenticated') {
       fetchSettings();
       fetchSocialAccounts();
+      fetchOAuthStatus();
       
       // Handle URL parameters for success/error messages
       const success = searchParams.get('success');
@@ -66,8 +72,8 @@ export default function SettingsPage() {
         router.replace('/settings');
       } else if (error) {
         const errorMessages: {[key: string]: string} = {
-          'linkedin_not_configured': 'LinkedIn OAuth is not configured. Please set up LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.',
-          'facebook_not_configured': 'Facebook OAuth is not configured. Please set up FACEBOOK_CLIENT_ID and FACEBOOK_CLIENT_SECRET.',
+          'linkedin_not_configured': 'LinkedIn OAuth is not configured. Please follow the setup guide in SOCIAL_MEDIA_SETUP.md to configure your LinkedIn credentials.',
+          'facebook_not_configured': 'Facebook OAuth is not configured. Please follow the setup guide in SOCIAL_MEDIA_SETUP.md to configure your Facebook credentials.',
           'oauth_error': 'OAuth authentication failed. Please try again.',
           'unauthorized': 'You must be logged in to connect social accounts.',
           'token_exchange_failed': 'Failed to exchange OAuth token. Please try again.',
@@ -108,6 +114,18 @@ export default function SettingsPage() {
     }
   };
 
+  const fetchOAuthStatus = async () => {
+    try {
+      const response = await fetch('/api/oauth/status');
+      if (response.ok) {
+        const data = await response.json();
+        setOauthStatus(data);
+      }
+    } catch (error) {
+      console.error('Error fetching OAuth status:', error);
+    }
+  };
+
   const saveSettings = async () => {
     setSaving(true);
     try {
@@ -131,7 +149,18 @@ export default function SettingsPage() {
     }
   };
 
+  // Check if OAuth is configured for a platform
+  const isOAuthConfigured = (platform: 'linkedin' | 'facebook') => {
+    return oauthStatus[platform];
+  };
+
   const connectSocialAccount = async (platform: 'linkedin' | 'facebook') => {
+    // Check if OAuth is configured
+    if (!isOAuthConfigured(platform)) {
+      alert(`${platform.charAt(0).toUpperCase() + platform.slice(1)} OAuth is not yet configured. Please follow the setup guide in SOCIAL_MEDIA_SETUP.md to add your OAuth credentials to the environment variables.`);
+      return;
+    }
+
     setConnecting(prev => ({ ...prev, [platform]: true }));
     
     try {
@@ -191,7 +220,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Layout>
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="md:flex md:items-center md:justify-between mb-8">
@@ -426,26 +455,11 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex">
-                  <ExclamationTriangleIcon className="h-5 w-5 text-yellow-400" />
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-yellow-800">
-                      OAuth Setup Required
-                    </h3>
-                    <div className="mt-2 text-sm text-yellow-700">
-                      <p>
-                        To enable social media posting, you'll need to configure OAuth applications 
-                        for LinkedIn and Facebook in your environment variables.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

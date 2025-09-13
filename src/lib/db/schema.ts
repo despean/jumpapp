@@ -2,16 +2,18 @@ import { pgTable, text, timestamp, boolean, integer, uuid, varchar, primaryKey }
 import { relations } from 'drizzle-orm';
 
 // Users table (NextAuth.js compatible)
-export const users = pgTable('user', {
+export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name'),
   email: text('email').notNull().unique(),
   emailVerified: timestamp('emailVerified', { mode: 'date' }),
   image: text('image'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 // NextAuth.js required tables
-export const accounts = pgTable('account', {
+export const accounts = pgTable('accounts', {
   userId: uuid('userId').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   type: text('type').notNull(),
   provider: text('provider').notNull(),
@@ -29,13 +31,13 @@ export const accounts = pgTable('account', {
   }),
 }));
 
-export const sessions = pgTable('session', {
+export const sessions = pgTable('sessions', {
   sessionToken: text('sessionToken').primaryKey(),
   userId: uuid('userId').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   expires: timestamp('expires', { mode: 'date' }).notNull(),
 });
 
-export const verificationTokens = pgTable('verificationToken', {
+export const verificationTokens = pgTable('verification_tokens', {
   identifier: text('identifier').notNull(),
   token: text('token').notNull(),
   expires: timestamp('expires', { mode: 'date' }).notNull(),

@@ -1,4 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
+import { logger } from '@/lib/logger';
 
 // Recall.ai API types
 export interface RecallBot {
@@ -103,7 +104,7 @@ export class RecallAIService {
       throw new Error('Recall.ai API key is required');
     }
     
-    console.log('🌍 Recall.ai service initialized:', {
+    logger.info('🌍 Recall.ai service initialized:', 'API', {
       region: this.region,
       baseURL: this.baseURL,
       hasApiKey: !!this.apiKey
@@ -122,7 +123,7 @@ export class RecallAIService {
    */
   async createBot(config: RecallBotCreate): Promise<RecallBot> {
     try {
-      console.log('🤖 Creating Recall.ai bot for:', config.meeting_url);
+      logger.info('🤖 Creating Recall.ai bot for:', 'API', config.meeting_url);
       
       const { recording_config, meeting_url, ...configWithoutMeetingUrl } = config;
       
@@ -155,14 +156,14 @@ export class RecallAIService {
         { headers: this.headers }
       );
 
-      console.log('✅ Bot created successfully:', response.data.id);
+      logger.info('✅ Bot created successfully:', 'API', response.data.id);
       return response.data;
     } catch (error) {
-      console.error('❌ Failed to create bot:', error);
+      logger.error('❌ Failed to create bot:', error);
       if (axios.isAxiosError(error)) {
-        console.error('❌ Recall.ai error response:', error.response?.data);
-        console.error('❌ Recall.ai error status:', error.response?.status);
-        console.error('❌ Recall.ai error headers:', error.response?.headers);
+        logger.error('❌ Recall.ai error response:', error.response?.data);
+        logger.error('❌ Recall.ai error status:', error.response?.status);
+        logger.error('❌ Recall.ai error headers:', error.response?.headers);
         const message = error.response?.data?.message || error.response?.data?.detail || error.message;
         throw new Error(`Recall.ai bot creation failed: ${message}`);
       }
@@ -182,7 +183,7 @@ export class RecallAIService {
 
       return response.data;
     } catch (error) {
-      console.error(`❌ Failed to get bot ${botId}:`, error);
+      logger.error(`❌ Failed to get bot ${botId}:`, error);
       if (axios.isAxiosError(error)) {
         const message = error.response?.data?.message || error.message;
         throw new Error(`Failed to get bot: ${message}`);
@@ -203,7 +204,7 @@ export class RecallAIService {
 
       return response.data;
     } catch (error) {
-      console.error('❌ Failed to list bots:', error);
+      logger.error('❌ Failed to list bots:', error);
       if (axios.isAxiosError(error)) {
         const message = error.response?.data?.message || error.message;
         throw new Error(`Failed to list bots: ${message}`);
@@ -218,25 +219,25 @@ export class RecallAIService {
    */
   async deleteBot(botId: string): Promise<boolean> {
     try {
-      console.log('🗑️ Deleting bot from Recall.ai:', botId);
-      console.warn('⚠️ This will permanently delete the bot from Recall.ai!');
+      logger.info('🗑️ Deleting bot from Recall.ai:', 'API', botId);
+      logger.warn('⚠️ This will permanently delete the bot from Recall.ai!');
       
       await axios.delete(
         `${this.baseURL}/bot/${botId}`,
         { headers: this.headers }
       );
 
-      console.log('✅ Bot deleted from Recall.ai:', botId);
+      logger.info('✅ Bot deleted from Recall.ai:', 'API', botId);
       return true;
     } catch (error) {
-      console.error('❌ Failed to delete bot from Recall.ai:', error);
+      logger.error('❌ Failed to delete bot from Recall.ai:', error);
       if (axios.isAxiosError(error)) {
-        console.error('❌ Delete error response:', error.response?.data);
-        console.error('❌ Delete error status:', error.response?.status);
+        logger.error('❌ Delete error response:', error.response?.data);
+        logger.error('❌ Delete error status:', error.response?.status);
         
         // Some bots might not be deletable (e.g., already finished)
         if (error.response?.status === 404) {
-          console.log('ℹ️ Bot not found on Recall.ai (might already be deleted)');
+          logger.info('ℹ️ Bot not found on Recall.ai (might already be deleted)');
           return true; // Consider it deleted
         }
         
@@ -259,7 +260,7 @@ export class RecallAIService {
       );
 
       const bot = botResponse.data;
-      console.log('🤖 Bot data:', bot);
+      logger.info('🤖 Bot data:', 'API', bot);
       // Check if there are recordings
       if (!bot.recordings || bot.recordings.length === 0) {
         return null;
@@ -359,7 +360,7 @@ export class RecallAIService {
         // Transcript not ready yet
         return null;
       }
-      console.error(`❌ Failed to get transcript for bot ${botId}:`, error);
+      logger.error(`❌ Failed to get transcript for bot ${botId}:`, error);
       throw error;
     }
   }
@@ -376,7 +377,7 @@ export class RecallAIService {
 
       return response.data.results;
     } catch (error) {
-      console.error(`❌ Failed to get media for bot ${botId}:`, error);
+      logger.error(`❌ Failed to get media for bot ${botId}:`, error);
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         // Media not ready yet
         return [];
@@ -441,7 +442,7 @@ export class RecallAIService {
         status: actualStatus
       };
     } catch (error) {
-      console.error(`❌ Failed to check if bot ${botId} is ready:`, error);
+      logger.error(`❌ Failed to check if bot ${botId} is ready:`, error);
       return {
         isReady: false,
         hasTranscript: false,
@@ -462,7 +463,7 @@ export class RecallAIService {
     const maxAttempts = Math.floor((maxWaitMinutes * 60) / pollIntervalSeconds);
     let attempts = 0;
 
-    console.log(`⏳ Waiting for bot ${botId} to complete (max ${maxWaitMinutes} minutes)...`);
+    logger.info(`⏳ Waiting for bot ${botId} to complete (max ${maxWaitMinutes} minutes)...`);
 
     while (attempts < maxAttempts) {
       try {
@@ -483,13 +484,13 @@ export class RecallAIService {
         await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
         attempts++;
       } catch (error) {
-        console.error(`❌ Error polling bot ${botId}:`, error);
+        logger.error(`❌ Error polling bot ${botId}:`, error);
         attempts++;
         await new Promise(resolve => setTimeout(resolve, pollIntervalSeconds * 1000));
       }
     }
 
-    console.log(`⏰ Timeout waiting for bot ${botId} to complete`);
+    logger.info(`⏰ Timeout waiting for bot ${botId} to complete`);
     return null;
   }
 
@@ -556,7 +557,7 @@ export class RecallAIService {
       
       return meetingUrl;
     } catch {
-      console.warn('⚠️ Could not parse meeting URL, using as-is:', meetingUrl);
+      logger.warn('⚠️ Could not parse meeting URL, using as-is:', meetingUrl);
       return meetingUrl;
     }
   }

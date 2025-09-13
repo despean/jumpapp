@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { eq, and, desc, lt } from 'drizzle-orm';
 import { meetings, users, transcripts, bots } from '@/lib/db/schema';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('📋 Fetching past meetings for user:', session.user.email);
+    logger.info('📋 Fetching past meetings for user:', 'API', session.user.email);
 
     // Get user from database
     const user = await db.query.users.findFirst({
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    console.log(`📊 Found ${pastMeetings.length} past meetings`);
+    logger.info(`📊 Found ${pastMeetings.length} past meetings`);
 
     // Process meetings to include additional info
     const processedMeetings = await Promise.all(
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
               };
             }
           } catch (error) {
-            console.warn('⚠️ Could not fetch bot info for meeting:', meeting.id);
+            logger.warn('⚠️ Could not fetch bot info for meeting:', meeting.id);
           }
         }
 
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest) {
     const withTranscripts = processedMeetings.filter(m => m.hasTranscript);
     const withoutTranscripts = processedMeetings.filter(m => !m.hasTranscript);
 
-    console.log(`📈 Meetings breakdown: ${withTranscripts.length} with transcripts, ${withoutTranscripts.length} without`);
+    logger.info(`📈 Meetings breakdown: ${withTranscripts.length} with transcripts, ${withoutTranscripts.length} without`);
 
     return NextResponse.json({
       meetings: processedMeetings,
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching past meetings:', error);
+    logger.error('❌ Error fetching past meetings:', error);
     
     return NextResponse.json({ 
       error: 'Failed to fetch past meetings',

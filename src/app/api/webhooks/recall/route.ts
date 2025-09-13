@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { meetings, transcripts, bots } from '@/lib/db/schema';
 import { RecallAIService } from '@/lib/recall-ai';
+import { logger } from '@/lib/logger';
 
 // Webhook payload types from Recall.ai
 interface RecallWebhookEvent {
@@ -25,7 +26,7 @@ interface RecallWebhookEvent {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🔗 Received Recall.ai webhook');
+    logger.info('🔗 Received Recall.ai webhook');
     
     // Verify webhook signature if configured
     const signature = request.headers.get('x-recall-signature');
@@ -33,11 +34,11 @@ export async function POST(request: NextRequest) {
     
     if (webhookSecret && signature) {
       // TODO: Implement signature verification for production
-      console.log('🔐 Webhook signature verification would go here');
+      logger.info('🔐 Webhook signature verification would go here');
     }
 
     const payload: RecallWebhookEvent = await request.json();
-    console.log('📨 Webhook event:', payload.event, 'for bot:', payload.data.bot_id);
+    logger.info('📨 Webhook event:', 'API', payload.event, 'for bot:', payload.data.bot_id);
 
     const { event, data } = payload;
     const botId = data.bot_id;
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!meeting) {
-      console.log(`⚠️ No meeting found for bot ${botId}`);
+      logger.info(`⚠️ No meeting found for bot ${botId}`);
       return NextResponse.json({ message: 'Bot not found in database' }, { status: 404 });
     }
 
@@ -63,17 +64,17 @@ export async function POST(request: NextRequest) {
         
       case 'transcript.partial_data':
         // Handle partial transcript data (real-time updates)
-        console.log('📝 Partial transcript received:', data.transcript?.text?.substring(0, 50) + '...');
+        logger.info('📝 Partial transcript received:', 'API', data.transcript?.text?.substring(0, 50) + '...');
         break;
         
       default:
-        console.log(`ℹ️ Unhandled webhook event: ${event}`);
+        logger.info(`ℹ️ Unhandled webhook event: ${event}`);
     }
 
     return NextResponse.json({ message: 'Webhook processed successfully' });
 
   } catch (error) {
-    console.error('❌ Error processing Recall.ai webhook:', error);
+    logger.error('❌ Error processing Recall.ai webhook:', error);
     return NextResponse.json(
       { error: 'Failed to process webhook' },
       { status: 500 }
@@ -83,12 +84,12 @@ export async function POST(request: NextRequest) {
 
 async function handleBotStatusChange(meeting: any, data: any) {
   const statusCode = data.status_change?.code;
-  console.log(`🔄 Bot status changed to: ${statusCode}`);
+  logger.info(`🔄 Bot status changed to: ${statusCode}`);
 
   switch (statusCode) {
     case 'call_ended':
     case 'done':
-      console.log('✅ Meeting ended, updating status and checking for transcript...');
+      logger.info('✅ Meeting ended, updating status and checking for transcript...');
       
       // Update meeting status
       await db.update(meetings)
@@ -106,15 +107,15 @@ async function handleBotStatusChange(meeting: any, data: any) {
         if (transcript) {
           await saveTranscriptToDatabase(meeting, transcript);
         } else {
-          console.log('⏳ Transcript not ready yet, will be picked up by polling');
+          logger.info('⏳ Transcript not ready yet, will be picked up by polling');
         }
       } catch (error) {
-        console.error('❌ Error getting transcript after status change:', error);
+        logger.error('❌ Error getting transcript after status change:', error);
       }
       break;
       
     case 'error':
-      console.log('❌ Bot encountered an error');
+      logger.info('❌ Bot encountered an error');
       await db.update(meetings)
         .set({
           status: 'error',
@@ -126,7 +127,7 @@ async function handleBotStatusChange(meeting: any, data: any) {
 }
 
 async function handleTranscriptData(meeting: any, data: any) {
-  console.log('📝 Final transcript data received');
+  logger.info('📝 Final transcript data received');
   
   // This is called when the full transcript is ready
   try {
@@ -137,7 +138,7 @@ async function handleTranscriptData(meeting: any, data: any) {
       await saveTranscriptToDatabase(meeting, transcript);
     }
   } catch (error) {
-    console.error('❌ Error processing transcript data:', error);
+    logger.error('❌ Error processing transcript data:', error);
   }
 }
 
@@ -148,7 +149,7 @@ async function saveTranscriptToDatabase(meeting: any, transcript: any) {
   });
 
   if (existingTranscript) {
-    console.log('📝 Transcript already exists, skipping save');
+    logger.info('📝 Transcript already exists, skipping save');
     return;
   }
 
@@ -173,5 +174,5 @@ async function saveTranscriptToDatabase(meeting: any, transcript: any) {
     processedAt: new Date(),
   }).returning();
 
-  console.log('✅ Transcript saved to database:', savedTranscript.id);
+  logger.info('✅ Transcript saved to database:', 'API', savedTranscript.id);
 }

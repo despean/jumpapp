@@ -5,6 +5,7 @@ import { RecallAIService } from '@/lib/recall-ai';
 import { db } from '@/lib/db';
 import { eq, and, isNotNull } from 'drizzle-orm';
 import { meetings, transcripts, users } from '@/lib/db/schema';
+import { logger } from '@/lib/logger';
 
 export async function POST() {
   try {
@@ -32,7 +33,7 @@ export async function POST() {
       )
     });
 
-    console.log(`🔍 Polling ${activeMeetings.length} active bot(s)...`);
+    logger.info(`🔍 Polling ${activeMeetings.length} active bot(s)...`);
 
     const recallService = new RecallAIService();
     const results = [];
@@ -41,7 +42,7 @@ export async function POST() {
       if (!meeting.botId) continue;
 
       try {
-        console.log(`📊 Checking bot ${meeting.botId} for meeting: ${meeting.title}`);
+        logger.info(`📊 Checking bot ${meeting.botId} for meeting: ${meeting.title}`);
         
         // Get bot status
         const bot = await recallService.getBot(meeting.botId);
@@ -119,7 +120,7 @@ export async function POST() {
               })
               .where(eq(meetings.id, meeting.id));
 
-            console.log(`🎉 Meeting ${meeting.title} marked as completed`);
+            logger.info(`🎉 Meeting ${meeting.title} marked as completed`);
           }
         }
 
@@ -134,7 +135,7 @@ export async function POST() {
         });
 
       } catch (error) {
-        console.error(`❌ Error polling bot ${meeting.botId}:`, error);
+        logger.error(`❌ Error polling bot ${meeting.botId}:`, error);
         results.push({
           meetingId: meeting.id,
           meetingTitle: meeting.title,
@@ -152,7 +153,7 @@ export async function POST() {
     });
 
   } catch (error) {
-    console.error('❌ Error in bot polling:', error);
+    logger.error('❌ Error in bot polling:', error);
     
     return NextResponse.json({ 
       error: 'Failed to poll bot status',

@@ -1,15 +1,38 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useSession, signIn } from 'next-auth/react';
-import { CalendarIcon, CogIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon, CogIcon, DocumentTextIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { UpcomingMeetings } from '@/components/UpcomingMeetings';
 import PastMeetings from '@/components/PastMeetings';
-import PollingStatus from '@/components/PollingStatus';
-import UserProfileDropdown from '@/components/UserProfileDropdown';
+import Layout from '@/components/Layout';
 
 export default function Home() {
   const { data: session, status } = useSession();
+  const [stats, setStats] = useState({
+    totalMeetings: 0,
+    postsGenerated: 0,
+    automations: 0
+  });
+
+  useEffect(() => {
+    if (session) {
+      fetchStats();
+    }
+  }, [session]);
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch('/api/stats');
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
 
   if (status === 'loading') {
     return (
@@ -81,99 +104,87 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">JumpApp</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/test-polling"
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Test Polling
-              </Link>
-              <UserProfileDropdown />
-            </div>
-          </div>
+    <Layout>
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Welcome back, {session.user?.name}
+          </p>
         </div>
-      </nav>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <PollingStatus />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Upcoming Meetings */}
-            <UpcomingMeetings />
-
-            {/* Past Meetings */}
-            <PastMeetings />
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <CalendarIcon className="h-6 w-6 text-gray-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Total Meetings
+                    </dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {stats.totalMeetings}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="mt-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <CalendarIcon className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Total Meetings
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900">0</dd>
-                      </dl>
-                    </div>
-                  </div>
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <DocumentTextIcon className="h-6 w-6 text-gray-400" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Posts Generated
+                    </dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {stats.postsGenerated}
+                    </dd>
+                  </dl>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <DocumentTextIcon className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Posts Generated
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900">0</dd>
-                      </dl>
-                    </div>
-                  </div>
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <CogIcon className="h-6 w-6 text-gray-400" />
                 </div>
-              </div>
-
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-5">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <CogIcon className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <div className="ml-5 w-0 flex-1">
-                      <dl>
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Active Automations
-                        </dt>
-                        <dd className="text-lg font-medium text-gray-900">0</dd>
-                      </dl>
-                    </div>
-                  </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      Active Automations
+                    </dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {stats.automations}
+                    </dd>
+                  </dl>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </main>
-    </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Upcoming Meetings */}
+          <UpcomingMeetings />
+
+          {/* Past Meetings */}
+          <PastMeetings />
+        </div>
+      </div>
+    </Layout>
   );
 }

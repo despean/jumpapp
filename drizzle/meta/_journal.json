@@ -8,6 +8,13 @@
       "when": 1757699807061,
       "tag": "0000_talented_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1757795909638,
+      "tag": "0001_mean_winter_soldier",
+      "breakpoints": true
     }
   ]
 }

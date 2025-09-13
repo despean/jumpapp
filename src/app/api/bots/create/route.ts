@@ -5,6 +5,7 @@ import { RecallAIService } from '@/lib/recall-ai';
 import { db } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
 import { meetings, users, bots, userSettings } from '@/lib/db/schema';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { meetingId, joinMinutesBefore } = body;
 
-    console.log('🤖 Bot creation request:', { meetingId, joinMinutesBefore });
+    logger.info('🤖 Bot creation request:', 'API', { meetingId, joinMinutesBefore });
 
     if (!meetingId) {
       return NextResponse.json({ error: 'Meeting ID is required' }, { status: 400 });
@@ -29,11 +30,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user) {
-      console.log('❌ User not found for email:', session.user.email);
+      logger.info('❌ User not found for email:', 'API', session.user.email);
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    console.log('👤 User found:', user.id);
+    logger.info('👤 User found:', 'API', user.id);
 
     // Get user settings for bot join timing
     const settings = await db.query.userSettings.findFirst({
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Use provided joinMinutesBefore or user settings or default to 2
     const actualJoinMinutesBefore = joinMinutesBefore ?? settings?.botJoinMinutes ?? 2;
     
-    console.log('⚙️ Bot join timing:', { 
+    logger.info('⚙️ Bot join timing:', 'API', { 
       provided: joinMinutesBefore, 
       userSetting: settings?.botJoinMinutes, 
       actual: actualJoinMinutesBefore 
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       )
     });
 
-    console.log('📅 Meeting lookup:', { meetingId, userId: user.id, found: !!meeting });
+    logger.info('📅 Meeting lookup:', 'API', { meetingId, userId: user.id, found: !!meeting });
 
     if (!meeting) {
       // Let's also check if the meetingId exists at all
@@ -65,9 +66,9 @@ export async function POST(request: NextRequest) {
         where: eq(meetings.id, meetingId)
       });
       
-      console.log('🔍 Meeting exists anywhere:', !!anyMeeting);
+      logger.info('🔍 Meeting exists anywhere:', 'API', !!anyMeeting);
       if (anyMeeting) {
-        console.log('📋 Meeting details:', {
+        logger.info('📋 Meeting details:', 'API', {
           id: anyMeeting.id,
           userId: anyMeeting.userId,
           title: anyMeeting.title,
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    console.log('📋 Meeting details:', {
+    logger.info('📋 Meeting details:', 'API', {
       id: meeting.id,
       title: meeting.title,
       meetingUrl: meeting.meetingUrl,
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!meeting.meetingUrl) {
-      console.log('❌ No meeting URL found');
+      logger.info('❌ No meeting URL found');
       return NextResponse.json({ 
         error: 'Meeting URL not found - cannot create bot' 
       }, { status: 400 });
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     // Check if meeting URL is supported
     const isSupported = RecallAIService.isSupportedMeetingUrl(meeting.meetingUrl);
-    console.log('🔍 Meeting URL support check:', {
+    logger.info('🔍 Meeting URL support check:', 'API', {
       url: meeting.meetingUrl,
       supported: isSupported
     });
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
     const joinTime = new Date(meetingStart.getTime() - (actualJoinMinutesBefore * 60 * 1000));
     const now = new Date();
 
-    console.log('🕐 Meeting timing:', {
+    logger.info('🕐 Meeting timing:', 'API', {
       meetingStart: meetingStart.toISOString(),
       joinTime: joinTime.toISOString(),
       now: now.toISOString(),
@@ -136,13 +137,13 @@ export async function POST(request: NextRequest) {
 
     // Clean the meeting URL for Recall.ai
     const cleanedUrl = RecallAIService.cleanMeetingUrl(meeting.meetingUrl);
-    console.log('🧹 URL cleaning:', {
+    logger.info('🧹 URL cleaning:', 'API', {
       original: meeting.meetingUrl,
       cleaned: cleanedUrl
     });
 
     // Check if we already have a bot for this meeting URL
-    console.log('🔍 Searching for existing bot:', {
+    logger.info('🔍 Searching for existing bot:', 'API', {
       userId: user.id,
       cleanedUrl: cleanedUrl
     });
@@ -154,13 +155,13 @@ export async function POST(request: NextRequest) {
       )
     });
 
-    console.log('🔍 Existing bot search result:', existingBot);
+    logger.info('🔍 Existing bot search result:', 'API', existingBot);
 
     // Also check all bots for this user to see what we have
     const allUserBots = await db.query.bots.findMany({
       where: eq(bots.userId, user.id)
     });
-    console.log('📋 All user bots:', allUserBots.map(b => ({
+    logger.info('📋 All user bots:', 'API', allUserBots.map(b => ({
       id: b.id,
       meetingUrl: b.meetingUrl,
       status: b.status
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
     const recallService = new RecallAIService();
 
     if (existingBot) {
-      console.log('🔄 Found existing bot, checking status:', existingBot.id);
+      logger.info('🔄 Found existing bot, checking status:', 'API', existingBot.id);
       
       try {
         // Get current status from Recall.ai
@@ -185,10 +186,10 @@ export async function POST(request: NextRequest) {
           .where(eq(bots.id, existingBot.id));
 
         bot = { ...botStatus, id: existingBot.id };
-        console.log('✅ Reusing existing bot:', existingBot.id, 'Status:', botStatus.status);
-        console.log('🔄 Bot reuse successful - no duplicate created');
+        logger.info('✅ Reusing existing bot:', 'API', existingBot.id, 'Status:', botStatus.status);
+        logger.info('🔄 Bot reuse successful - no duplicate created');
       } catch {
-        console.log('⚠️ Existing bot not found on Recall.ai, creating new one');
+        logger.info('⚠️ Existing bot not found on Recall.ai, creating new one');
         // Bot doesn't exist on Recall.ai anymore, we'll create a new one
         // Set existingBot to undefined to force creation of new bot
         existingBot = undefined;
@@ -197,7 +198,7 @@ export async function POST(request: NextRequest) {
 
     if (!existingBot || !bot) {
       // Create new bot
-      console.log('🤖 Creating new bot for meeting URL:', cleanedUrl);
+      logger.info('🤖 Creating new bot for meeting URL:', 'API', cleanedUrl);
       
       const botConfig = {
         meeting_url: cleanedUrl,
@@ -211,7 +212,7 @@ export async function POST(request: NextRequest) {
         },
       };
 
-      console.log('🤖 Final bot configuration:', JSON.stringify(botConfig, null, 2));
+      logger.info('🤖 Final bot configuration:', 'API', JSON.stringify(botConfig, null, 2));
       
       bot = await recallService.createBot(botConfig);
 
@@ -225,11 +226,11 @@ export async function POST(request: NextRequest) {
         platform: meeting.platform,
       };
 
-      console.log('💾 Saving bot to database:', botData);
+      logger.info('💾 Saving bot to database:', 'API', botData);
       
       await db.insert(bots).values(botData);
 
-      console.log('✅ New bot saved to database:', bot.id);
+      logger.info('✅ New bot saved to database:', 'API', bot.id);
     }
 
     // Update meeting with bot ID
@@ -241,7 +242,7 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(meetings.id, meetingId));
 
-    console.log('✅ Bot created and meeting updated:', {
+    logger.info('✅ Bot created and meeting updated:', 'API', {
       botId: bot.id,
       meetingId,
       meetingUrl: meeting.meetingUrl
@@ -264,7 +265,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Error creating bot:', error);
+    logger.error('❌ Error creating bot:', error);
     
     let errorMessage = 'Failed to create meeting bot';
     if (error instanceof Error) {
