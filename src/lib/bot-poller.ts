@@ -156,14 +156,6 @@ export class BotPollingService {
           const recallTranscript = await recallService.getBotTranscript(meeting.botId);
           
           if (recallTranscript) {
-            console.log(`📝 Processing transcript for bot ${meeting.botId}:`, {
-              hasWords: !!recallTranscript.words,
-              wordsCount: recallTranscript.words?.length || 0,
-              hasSpeakers: !!recallTranscript.speakers,
-              speakersCount: recallTranscript.speakers?.length || 0,
-              contentLength: recallTranscript.transcript_text?.length || 0
-            });
-
             // Extract attendee information
             const attendees = recallTranscript.speakers?.map(speaker => ({
               id: speaker.id,
@@ -176,12 +168,7 @@ export class BotPollingService {
               const lastWord = recallTranscript.words[recallTranscript.words.length - 1];
               if (lastWord && typeof lastWord.end_time === 'number' && !isNaN(lastWord.end_time)) {
                 duration = Math.round(lastWord.end_time / 60);
-                console.log(`⏱️ Calculated duration: ${duration} minutes from end_time: ${lastWord.end_time}`);
-              } else {
-                console.log(`⚠️ Invalid end_time in last word:`, lastWord);
               }
-            } else {
-              console.log(`⚠️ No words found in transcript for duration calculation`);
             }
 
             // Save transcript to database

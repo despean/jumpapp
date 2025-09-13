@@ -103,6 +103,7 @@ export async function GET(request: NextRequest) {
           meetingUrl: meeting.meetingUrl,
           attendeesCount: meeting.attendeesCount,
           status: meeting.status,
+          botId: meeting.botId, // Include the actual botId for debugging
           botInfo,
           transcript: transcriptInfo,
           hasTranscript: !!transcriptInfo,

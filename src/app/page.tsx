@@ -4,6 +4,7 @@ import { useSession, signIn } from 'next-auth/react';
 import { CalendarIcon, CogIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { UpcomingMeetings } from '@/components/UpcomingMeetings';
+import PastMeetings from '@/components/PastMeetings';
 import PollingStatus from '@/components/PollingStatus';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
 
@@ -90,12 +91,6 @@ export default function Home() {
             </div>
             <div className="flex items-center space-x-4">
               <Link
-                href="/meetings"
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Past Meetings
-              </Link>
-              <Link
                 href="/test-polling"
                 className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
               >
@@ -116,20 +111,7 @@ export default function Home() {
             <UpcomingMeetings />
 
             {/* Past Meetings */}
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                  Past Meetings
-                </h3>
-                <div className="text-center py-12">
-                  <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No meetings yet</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Your completed meetings with transcripts will appear here.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <PastMeetings />
           </div>
 
           {/* Quick Stats */}

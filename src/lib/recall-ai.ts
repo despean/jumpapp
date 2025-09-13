@@ -298,9 +298,51 @@ export class RecallAIService {
         words = transcriptResponse.data.words || [];
         speakers = transcriptResponse.data.speakers || [];
       } else if (Array.isArray(transcriptResponse.data)) {
-        // Sometimes it's an array of transcript segments
-        transcriptText = transcriptResponse.data.map(segment => segment.text || segment.transcript).join(' ');
-        words = transcriptResponse.data.flatMap(segment => segment.words || []);
+        // Check if it's the participant-based format
+        const firstItem = transcriptResponse.data[0];
+        if (firstItem && firstItem.participant && firstItem.words) {
+          // Participant-based format: [{ participant: {...}, words: [...] }]
+          
+          // Extract unique speakers
+          const speakerMap = new Map();
+          transcriptResponse.data.forEach((segment: { participant?: { id: number; name?: string } }) => {
+            if (segment.participant) {
+              speakerMap.set(segment.participant.id, {
+                id: String(segment.participant.id),
+                name: segment.participant.name || `Speaker ${segment.participant.id}`
+              });
+            }
+          });
+          speakers = Array.from(speakerMap.values());
+          
+          // Extract all words with proper timestamps
+          words = [];
+          const textParts: string[] = [];
+          
+          transcriptResponse.data.forEach((segment: { words?: Array<{ text?: string; start_timestamp?: { relative?: number }; end_timestamp?: { relative?: number } }> }) => {
+            if (segment.words && Array.isArray(segment.words)) {
+              segment.words.forEach((word: { text?: string; start_timestamp?: { relative?: number }; end_timestamp?: { relative?: number } }) => {
+                if (word.text) {
+                  textParts.push(word.text);
+                  
+                  // Convert timestamps to seconds (from relative seconds)
+                  words.push({
+                    text: word.text,
+                    start_time: word.start_timestamp?.relative || 0,
+                    end_time: word.end_timestamp?.relative || 0
+                  });
+                }
+              });
+            }
+          });
+          
+          transcriptText = textParts.join(' ');
+          
+        } else {
+          // Legacy array format: sometimes it's an array of transcript segments
+          transcriptText = transcriptResponse.data.map((segment: { text?: string; transcript?: string }) => segment.text || segment.transcript).join(' ');
+          words = transcriptResponse.data.flatMap((segment: { words?: { start_time: number; end_time: number; text: string }[] }) => segment.words || []);
+        }
       }
       
       // Return in our expected format
