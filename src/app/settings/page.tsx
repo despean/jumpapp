@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
@@ -16,7 +16,6 @@ import Layout from '@/components/Layout';
 interface UserSettings {
   botJoinMinutes: number;
   defaultNotetaker: boolean;
-  notifications: boolean;
 }
 
 interface SocialAccount {
@@ -27,15 +26,14 @@ interface SocialAccount {
   expiresAt?: string;
 }
 
-export default function SettingsPage() {
+function SettingsContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
   
   const [settings, setSettings] = useState<UserSettings>({
     botJoinMinutes: 2,
-    defaultNotetaker: true,
-    notifications: true
+    defaultNotetaker: true
   });
   
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
@@ -286,21 +284,6 @@ export default function SettingsPage() {
                   </label>
                 </div>
 
-                <div className="flex items-center">
-                  <input
-                    id="notifications"
-                    type="checkbox"
-                    checked={settings.notifications}
-                    onChange={(e) => setSettings(prev => ({ 
-                      ...prev, 
-                      notifications: e.target.checked 
-                    }))}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="notifications" className="ml-2 block text-sm text-gray-900">
-                    Enable email notifications for meeting updates
-                  </label>
-                </div>
               </div>
 
               <div className="mt-6">
@@ -461,5 +444,17 @@ export default function SettingsPage() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <SettingsContent />
+    </Suspense>
   );
 }

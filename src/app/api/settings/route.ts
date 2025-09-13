@@ -33,8 +33,7 @@ export async function GET() {
       const [newSettings] = await db.insert(userSettings).values({
         userId: user.id,
         botJoinMinutes: 2,
-        defaultNotetaker: true,
-        notifications: true
+        defaultNotetaker: true
       }).returning();
       
       settings = newSettings;
@@ -42,8 +41,7 @@ export async function GET() {
 
     return NextResponse.json({
       botJoinMinutes: settings.botJoinMinutes,
-      defaultNotetaker: settings.defaultNotetaker,
-      notifications: settings.notifications
+      defaultNotetaker: settings.defaultNotetaker
     });
 
   } catch (error) {
@@ -64,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { botJoinMinutes, defaultNotetaker, notifications } = body;
+    const { botJoinMinutes, defaultNotetaker } = body;
 
     // Validate bot join minutes
     if (botJoinMinutes < 1 || botJoinMinutes > 15) {
@@ -92,7 +90,6 @@ export async function POST(request: NextRequest) {
         .set({
           botJoinMinutes,
           defaultNotetaker,
-          notifications,
           updatedAt: new Date()
         })
         .where(eq(userSettings.userId, user.id));
@@ -100,8 +97,7 @@ export async function POST(request: NextRequest) {
       await db.insert(userSettings).values({
         userId: user.id,
         botJoinMinutes,
-        defaultNotetaker,
-        notifications
+        defaultNotetaker
       });
     }
 

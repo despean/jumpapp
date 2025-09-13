@@ -1,7 +1,7 @@
 'use client';
 
 import { getProviders, signIn, getSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 interface Provider {
@@ -12,7 +12,7 @@ interface Provider {
   callbackUrl: string;
 }
 
-export default function SignIn() {
+function SignInContent() {
   const [providers, setProviders] = useState<Record<string, Provider> | null>(null);
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
@@ -130,5 +130,17 @@ export default function SignIn() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignIn() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <SignInContent />
+    </Suspense>
   );
 }

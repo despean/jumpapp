@@ -79,51 +79,52 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         try {
           const recallTranscript = await recallService.getBotTranscript(botId);
         
-        if (recallTranscript) {
-          console.log('✅ Transcript found, saving to database...');
-          
-          // Extract attendee information
-          const attendees = recallTranscript.speakers.map(speaker => ({
-            id: speaker.id,
-            name: speaker.name,
-          }));
+          if (recallTranscript) {
+            console.log('✅ Transcript found, saving to database...');
+            
+            // Extract attendee information
+            const attendees = recallTranscript.speakers.map(speaker => ({
+              id: speaker.id,
+              name: speaker.name,
+            }));
 
-          // Calculate duration from transcript words
-          const duration = recallTranscript.words.length > 0 
-            ? Math.round(recallTranscript.words[recallTranscript.words.length - 1].end_time / 60)
-            : 0;
+            // Calculate duration from transcript words
+            const duration = recallTranscript.words.length > 0 
+              ? Math.round(recallTranscript.words[recallTranscript.words.length - 1].end_time / 60)
+              : 0;
 
-          // Save transcript to database
-          const [savedTranscript] = await db.insert(transcripts).values({
-            meetingId: meeting.id,
-            content: recallTranscript.transcript_text,
-            attendees: JSON.stringify(attendees),
-            duration,
-            processedAt: new Date(),
-          }).returning();
+            // Save transcript to database
+            const [savedTranscript] = await db.insert(transcripts).values({
+              meetingId: meeting.id,
+              content: recallTranscript.transcript_text,
+              attendees: JSON.stringify(attendees),
+              duration,
+              processedAt: new Date(),
+            }).returning();
 
-          // Update meeting status
-          await db.update(meetings)
-            .set({
-              status: 'completed',
-              updatedAt: new Date(),
-            })
-            .where(eq(meetings.id, meeting.id));
+            // Update meeting status
+            await db.update(meetings)
+              .set({
+                status: 'completed',
+                updatedAt: new Date(),
+              })
+              .where(eq(meetings.id, meeting.id));
 
-          transcript = {
-            id: savedTranscript.id,
-            content: savedTranscript.content,
-            summary: savedTranscript.summary,
-            attendees,
-            duration,
-            processedAt: savedTranscript.processedAt,
-          };
-          hasTranscript = true;
+            transcript = {
+              id: savedTranscript.id,
+              content: savedTranscript.content,
+              summary: savedTranscript.summary,
+              attendees,
+              duration,
+              processedAt: savedTranscript.processedAt,
+            };
+            hasTranscript = true;
 
-          console.log('✅ Transcript saved successfully');
+            console.log('✅ Transcript saved successfully');
+          }
+        } catch (error) {
+          console.log('⏳ Transcript not ready yet:', error.message);
         }
-      } catch (error) {
-        console.log('⏳ Transcript not ready yet:', error.message);
       }
     }
 

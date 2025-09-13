@@ -161,7 +161,6 @@ export const userSettings = pgTable('user_settings', {
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   botJoinMinutes: integer('bot_join_minutes').default(2), // minutes before meeting to join bot
   defaultNotetaker: boolean('default_notetaker').default(true),
-  notifications: boolean('notifications').default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

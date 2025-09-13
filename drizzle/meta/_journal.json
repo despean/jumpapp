@@ -15,6 +15,13 @@
       "when": 1757795909638,
       "tag": "0001_mean_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1757803162193,
+      "tag": "0002_vengeful_iron_patriot",
+      "breakpoints": true
     }
   ]
 }
