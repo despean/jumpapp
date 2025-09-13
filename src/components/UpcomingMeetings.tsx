@@ -239,7 +239,7 @@ export function UpcomingMeetings() {
           },
           body: JSON.stringify({
             meetingId: meetingId,
-            joinMinutesBefore: 2, // TODO: Make this configurable
+            // joinMinutesBefore will use user settings from backend
           }),
         });
 

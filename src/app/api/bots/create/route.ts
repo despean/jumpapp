@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { RecallAIService } from '@/lib/recall-ai';
 import { db } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
-import { meetings, users, bots } from '@/lib/db/schema';
+import { meetings, users, bots, userSettings } from '@/lib/db/schema';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { meetingId, joinMinutesBefore = 2 } = body;
+    const { meetingId, joinMinutesBefore } = body;
 
     console.log('🤖 Bot creation request:', { meetingId, joinMinutesBefore });
 
@@ -34,6 +34,20 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('👤 User found:', user.id);
+
+    // Get user settings for bot join timing
+    const settings = await db.query.userSettings.findFirst({
+      where: eq(userSettings.userId, user.id)
+    });
+
+    // Use provided joinMinutesBefore or user settings or default to 2
+    const actualJoinMinutesBefore = joinMinutesBefore ?? settings?.botJoinMinutes ?? 2;
+    
+    console.log('⚙️ Bot join timing:', { 
+      provided: joinMinutesBefore, 
+      userSetting: settings?.botJoinMinutes, 
+      actual: actualJoinMinutesBefore 
+    });
 
     // Get meeting from database
     const meeting = await db.query.meetings.findFirst({
@@ -110,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate when to join the meeting
     const meetingStart = new Date(meeting.startTime);
-    const joinTime = new Date(meetingStart.getTime() - (joinMinutesBefore * 60 * 1000));
+    const joinTime = new Date(meetingStart.getTime() - (actualJoinMinutesBefore * 60 * 1000));
     const now = new Date();
 
     console.log('🕐 Meeting timing:', {
@@ -133,7 +147,7 @@ export async function POST(request: NextRequest) {
       cleanedUrl: cleanedUrl
     });
 
-    const existingBot = await db.query.bots.findFirst({
+    let existingBot = await db.query.bots.findFirst({
       where: and(
         eq(bots.userId, user.id),
         eq(bots.meetingUrl, cleanedUrl)
@@ -170,13 +184,14 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(bots.id, existingBot.id));
 
-        bot = { id: existingBot.id, ...botStatus };
+        bot = { ...botStatus, id: existingBot.id };
         console.log('✅ Reusing existing bot:', existingBot.id, 'Status:', botStatus.status);
         console.log('🔄 Bot reuse successful - no duplicate created');
-      } catch (error) {
+      } catch {
         console.log('⚠️ Existing bot not found on Recall.ai, creating new one');
-        // Bot doesn't exist on Recall.ai anymore, create a new one
-        existingBot.id = null; // Force creation of new bot
+        // Bot doesn't exist on Recall.ai anymore, we'll create a new one
+        // Set existingBot to undefined to force creation of new bot
+        existingBot = undefined;
       }
     }
 
