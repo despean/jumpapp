@@ -51,6 +51,7 @@ export default function MeetingDetailPage() {
   const [aiSummary, setAiSummary] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState<{[key: string]: boolean}>({});
   const [aiErrors, setAiErrors] = useState<{[key: string]: string}>({});
+  const [postingLoading, setPostingLoading] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -165,6 +166,49 @@ export default function MeetingDetailPage() {
       setAiErrors(prev => ({ ...prev, summary: 'Failed to generate summary' }));
     } finally {
       setAiLoading(prev => ({ ...prev, summary: false }));
+    }
+  };
+
+  // Copy to clipboard function
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here
+      alert('Content copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+      alert('Failed to copy content');
+    }
+  };
+
+  // Post to social media function
+  const postToSocialMedia = async (platform: 'linkedin' | 'facebook', content: string) => {
+    setPostingLoading(prev => ({ ...prev, [platform]: true }));
+    
+    try {
+      const response = await fetch(`/api/social/${platform}/post`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        if (data.success) {
+          alert(`Successfully posted to ${platform.charAt(0).toUpperCase() + platform.slice(1)}!`);
+        } else {
+          alert(data.message || `Posting to ${platform} is not yet configured.`);
+        }
+      } else {
+        alert(data.error || `Failed to post to ${platform}`);
+      }
+    } catch (err) {
+      alert(`Failed to post to ${platform}`);
+    } finally {
+      setPostingLoading(prev => ({ ...prev, [platform]: false }));
     }
   };
 
@@ -512,7 +556,7 @@ export default function MeetingDetailPage() {
                       AI-Generated Social Media Posts
                     </h3>
                     <div className="mt-1 text-sm text-gray-500">
-                      <p>Create engaging posts for LinkedIn, Facebook, and Twitter based on your meeting content.</p>
+                      <p>Create engaging posts for LinkedIn and Facebook based on your meeting content.</p>
                     </div>
                   </div>
                 </div>
@@ -545,7 +589,7 @@ export default function MeetingDetailPage() {
             )}
 
             {aiLoading.social && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex">
                   <div className="flex-shrink-0">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
@@ -553,7 +597,7 @@ export default function MeetingDetailPage() {
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-blue-800">Generating Social Media Posts...</h3>
                     <div className="mt-2 text-sm text-blue-700">
-                      <p>Creating engaging posts for LinkedIn, Facebook, and Twitter.</p>
+                      <p>Creating engaging posts for LinkedIn and Facebook.</p>
                     </div>
                   </div>
                 </div>
@@ -565,7 +609,7 @@ export default function MeetingDetailPage() {
                 <ShareIcon className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-lg font-medium text-gray-900">Ready to Generate Posts</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Click "Generate Posts" to create AI-powered social media content for LinkedIn, Facebook, and Twitter.
+                  Click "Generate Posts" to create AI-powered social media content for LinkedIn and Facebook.
                 </p>
               </div>
             )}
@@ -586,11 +630,6 @@ export default function MeetingDetailPage() {
                             <span className="text-white text-xs font-bold">f</span>
                           </div>
                         )}
-                        {post.platform === 'twitter' && (
-                          <div className="h-8 w-8 bg-sky-400 rounded flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">𝕏</span>
-                          </div>
-                        )}
                       </div>
                       <div>
                         <h4 className="text-lg font-medium text-gray-900 capitalize">{post.platform}</h4>
@@ -601,12 +640,19 @@ export default function MeetingDetailPage() {
                     </div>
                     
                     <div className="flex space-x-2">
-                      <button className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">
+                      <button
+                        onClick={() => copyToClipboard(post.content)}
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
+                      >
                         <EyeIcon className="h-4 w-4 mr-1" />
-                        Preview
+                        Copy
                       </button>
-                      <button className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700">
-                        Copy Content
+                      <button
+                        onClick={() => postToSocialMedia(post.platform, post.content)}
+                        disabled={postingLoading[post.platform]}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {postingLoading[post.platform] ? 'Posting...' : 'Post'}
                       </button>
                     </div>
                   </div>

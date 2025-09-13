@@ -21,7 +21,7 @@ export interface GeneratedEmail {
 }
 
 export interface GeneratedSocialPost {
-  platform: 'linkedin' | 'facebook' | 'twitter';
+  platform: 'linkedin' | 'facebook';
   content: string;
   hashtags: string[];
   engagement_hook: string;
@@ -83,7 +83,7 @@ export class AIContentService {
   }
 
   /**
-   * Generate social media posts for multiple platforms
+   * Generate social media posts for LinkedIn and Facebook
    */
   async generateSocialMediaPosts(context: MeetingContext): Promise<GeneratedSocialPost[]> {
     const posts: GeneratedSocialPost[] = [];
@@ -93,9 +93,6 @@ export class AIContentService {
     
     // Generate Facebook post
     posts.push(await this.generateFacebookPost(context));
-    
-    // Generate Twitter post
-    posts.push(await this.generateTwitterPost(context));
     
     return posts;
   }
@@ -258,44 +255,6 @@ Requirements:
     };
   }
 
-  private async generateTwitterPost(context: MeetingContext): Promise<GeneratedSocialPost> {
-    const prompt = `Create a Twitter/X post about this meeting:
-
-Meeting: ${context.title}
-Key insight: ${context.transcript.substring(0, 300)}...
-
-Requirements:
-- Under 280 characters
-- Include 2-3 relevant hashtags
-- Share one key insight or takeaway
-- Make it engaging and retweetable
-- Use concise, impactful language`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a Twitter content expert. Create concise, impactful tweets that drive engagement."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.8,
-      max_tokens: 100
-    });
-
-    const content = completion.choices[0]?.message?.content || '';
-    
-    return {
-      platform: 'twitter',
-      content: content,
-      hashtags: this.extractHashtags(content),
-      engagement_hook: this.extractEngagementHook(content)
-    };
-  }
 
   private parseEmailResponse(response: string, tone: string): GeneratedEmail {
     const lines = response.split('\n');
