@@ -35,13 +35,6 @@ interface Attendee {
   name: string;
 }
 
-interface SocialMediaPost {
-  id: string;
-  platform: string;
-  content: string;
-  status: 'draft' | 'scheduled' | 'published';
-  scheduledFor?: string;
-}
 
 export default function MeetingDetailPage() {
   const params = useParams();
@@ -51,6 +44,13 @@ export default function MeetingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'transcript' | 'email' | 'social'>('transcript');
+  
+  // AI Content State
+  const [aiEmail, setAiEmail] = useState<any>(null);
+  const [aiSocialPosts, setAiSocialPosts] = useState<any[]>([]);
+  const [aiSummary, setAiSummary] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState<{[key: string]: boolean}>({});
+  const [aiErrors, setAiErrors] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -65,7 +65,7 @@ export default function MeetingDetailPage() {
 
   const fetchMeetingDetails = async () => {
     try {
-      const response = await fetch(`/api/meetings/${params.id}`);
+      const response = await fetch(`/api/meetings/details?id=${params.id}`);
       const data = await response.json();
       
       if (response.ok) {
@@ -77,6 +77,94 @@ export default function MeetingDetailPage() {
       setError('Failed to load meeting details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // AI Content Generation Functions
+  const generateAIEmail = async (tone: 'professional' | 'casual' | 'formal' = 'professional') => {
+    if (!params.id) return;
+    
+    setAiLoading(prev => ({ ...prev, email: true }));
+    setAiErrors(prev => ({ ...prev, email: '' }));
+    
+    try {
+      const response = await fetch('/api/ai/generate-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ meetingId: params.id, tone }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setAiEmail(data.email);
+      } else {
+        setAiErrors(prev => ({ ...prev, email: data.error || 'Failed to generate email' }));
+      }
+    } catch (err) {
+      setAiErrors(prev => ({ ...prev, email: 'Failed to generate email' }));
+    } finally {
+      setAiLoading(prev => ({ ...prev, email: false }));
+    }
+  };
+
+  const generateAISocialPosts = async () => {
+    if (!params.id) return;
+    
+    setAiLoading(prev => ({ ...prev, social: true }));
+    setAiErrors(prev => ({ ...prev, social: '' }));
+    
+    try {
+      const response = await fetch('/api/ai/generate-social-posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ meetingId: params.id }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setAiSocialPosts(data.posts);
+      } else {
+        setAiErrors(prev => ({ ...prev, social: data.error || 'Failed to generate social posts' }));
+      }
+    } catch (err) {
+      setAiErrors(prev => ({ ...prev, social: 'Failed to generate social posts' }));
+    } finally {
+      setAiLoading(prev => ({ ...prev, social: false }));
+    }
+  };
+
+  const generateAISummary = async () => {
+    if (!params.id) return;
+    
+    setAiLoading(prev => ({ ...prev, summary: true }));
+    setAiErrors(prev => ({ ...prev, summary: '' }));
+    
+    try {
+      const response = await fetch('/api/ai/generate-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ meetingId: params.id }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setAiSummary(data.summary);
+      } else {
+        setAiErrors(prev => ({ ...prev, summary: data.error || 'Failed to generate summary' }));
+      }
+    } catch (err) {
+      setAiErrors(prev => ({ ...prev, summary: 'Failed to generate summary' }));
+    } finally {
+      setAiLoading(prev => ({ ...prev, summary: false }));
     }
   };
 
@@ -112,54 +200,6 @@ export default function MeetingDetailPage() {
     }
   };
 
-  // Mock data for AI-generated content (placeholders)
-  const mockFollowUpEmail = `Subject: Follow-up from our meeting - ${meeting?.title}
-
-Hi team,
-
-Thank you for joining today's productive meeting. Here are the key takeaways and action items:
-
-**Key Discussion Points:**
-• [AI will extract main topics discussed]
-• [AI will identify important decisions made]
-• [AI will highlight key insights shared]
-
-**Action Items:**
-• [AI will identify tasks assigned during the meeting]
-• [AI will extract deadlines and responsibilities]
-• [AI will note follow-up meetings needed]
-
-**Next Steps:**
-• [AI will suggest logical next steps based on discussion]
-
-Please let me know if I missed anything or if you have additional thoughts.
-
-Best regards,
-[Your Name]
-
----
-This email was generated by JumpApp AI based on your meeting transcript.`;
-
-  const mockSocialPosts: SocialMediaPost[] = [
-    {
-      id: '1',
-      platform: 'LinkedIn',
-      content: `Just wrapped up an insightful meeting about ${meeting?.title || '[Meeting Topic]'}. Key insights: [AI will extract 2-3 main points from transcript]. Excited about the next steps! #productivity #teamwork`,
-      status: 'draft'
-    },
-    {
-      id: '2',
-      platform: 'Facebook',
-      content: `Great discussion today with the team! We covered some important ground on ${meeting?.title || '[Meeting Topic]'}. [AI will create engaging summary]. Looking forward to implementing these ideas! 💡`,
-      status: 'draft'
-    },
-    {
-      id: '3',
-      platform: 'Twitter',
-      content: `Productive meeting ✅ Key takeaways: [AI will create concise bullet points]. ${meeting?.title || '[Meeting Topic]'} #meetings #productivity`,
-      status: 'draft'
-    }
-  ];
 
   if (status === 'loading' || loading) {
     return (
@@ -349,44 +389,102 @@ This email was generated by JumpApp AI based on your meeting transcript.`;
         {activeTab === 'email' && (
           <div className="bg-white shadow rounded-lg">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">AI-Generated Follow-up Email</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Draft email based on meeting transcript and key discussion points
-              </p>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">AI-Generated Follow-up Email</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Draft email based on meeting transcript and key discussion points
+                  </p>
+                </div>
+                {meeting?.transcript?.content && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => generateAIEmail('professional')}
+                      disabled={aiLoading.email}
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {aiLoading.email ? 'Generating...' : 'Generate Email'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="px-6 py-6">
-              {meeting.transcript?.content ? (
+              {meeting?.transcript?.content ? (
                 <div className="space-y-4">
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <DocumentTextIcon className="h-5 w-5 text-amber-400" />
-                      </div>
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-amber-800">
-                          AI Content Generation Coming Soon
-                        </h3>
-                        <div className="mt-2 text-sm text-amber-700">
-                          <p>This is a placeholder for AI-generated follow-up email based on your meeting transcript.</p>
+                  {aiErrors.email && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <DocumentTextIcon className="h-5 w-5 text-red-400" />
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-red-800">Error</h3>
+                          <div className="mt-2 text-sm text-red-700">
+                            <p>{aiErrors.email}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {aiLoading.email && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-blue-800">Generating AI Email...</h3>
+                          <div className="mt-2 text-sm text-blue-700">
+                            <p>Analyzing meeting transcript and creating personalized follow-up email.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {aiEmail ? (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                      <div className="mb-4">
+                        <label className="text-sm font-medium text-gray-700">Subject:</label>
+                        <div className="mt-1 p-3 bg-white border border-gray-300 rounded-md">
+                          <p className="text-sm text-gray-900">{aiEmail.subject}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Email Body:</label>
+                        <div className="mt-1 p-4 bg-white border border-gray-300 rounded-md">
+                          <div className="whitespace-pre-wrap text-sm text-gray-900">
+                            {aiEmail.body}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : !aiLoading.email && !aiErrors.email && (
+                    <div className="text-center py-12">
+                      <EnvelopeIcon className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-lg font-medium text-gray-900">Ready to Generate Email</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Click "Generate Email" to create an AI-powered follow-up email based on your meeting transcript.
+                      </p>
+                    </div>
+                  )}
                   
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                    <pre className="whitespace-pre-wrap text-sm text-gray-900 font-mono">
-                      {mockFollowUpEmail}
-                    </pre>
-                  </div>
-                  
-                  <div className="flex justify-end space-x-3">
-                    <button className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                      Edit Draft
-                    </button>
-                    <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                      Send Email
-                    </button>
-                  </div>
+                  {aiEmail && (
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={() => generateAIEmail('professional')}
+                        disabled={aiLoading.email}
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Regenerate
+                      </button>
+                      <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        Copy to Clipboard
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12">
@@ -403,48 +501,101 @@ This email was generated by JumpApp AI based on your meeting transcript.`;
 
         {activeTab === 'social' && (
           <div className="space-y-6">
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <ShareIcon className="h-5 w-5 text-amber-400" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-amber-800">
-                    AI Social Media Generation Coming Soon
-                  </h3>
-                  <div className="mt-2 text-sm text-amber-700">
-                    <p>These are placeholders for AI-generated social media posts based on your meeting content.</p>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <ShareIcon className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-gray-900">
+                      AI-Generated Social Media Posts
+                    </h3>
+                    <div className="mt-1 text-sm text-gray-500">
+                      <p>Create engaging posts for LinkedIn, Facebook, and Twitter based on your meeting content.</p>
+                    </div>
                   </div>
                 </div>
+                {meeting?.transcript?.content && (
+                  <button
+                    onClick={generateAISocialPosts}
+                    disabled={aiLoading.social}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {aiLoading.social ? 'Generating...' : 'Generate Posts'}
+                  </button>
+                )}
               </div>
             </div>
 
-            {mockSocialPosts.map((post) => (
-              <div key={post.id} className="bg-white shadow rounded-lg">
+            {aiErrors.social && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <DocumentTextIcon className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">Error</h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      <p>{aiErrors.social}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {aiLoading.social && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">Generating Social Media Posts...</h3>
+                    <div className="mt-2 text-sm text-blue-700">
+                      <p>Creating engaging posts for LinkedIn, Facebook, and Twitter.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!aiLoading.social && !aiErrors.social && aiSocialPosts.length === 0 && meeting?.transcript?.content && (
+              <div className="text-center py-12">
+                <ShareIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-lg font-medium text-gray-900">Ready to Generate Posts</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Click "Generate Posts" to create AI-powered social media content for LinkedIn, Facebook, and Twitter.
+                </p>
+              </div>
+            )}
+
+            {aiSocialPosts.map((post, index) => (
+              <div key={index} className="bg-white shadow rounded-lg">
                 <div className="px-6 py-4 border-b border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="flex-shrink-0">
-                        {post.platform === 'LinkedIn' && (
+                        {post.platform === 'linkedin' && (
                           <div className="h-8 w-8 bg-blue-600 rounded flex items-center justify-center">
                             <span className="text-white text-xs font-bold">in</span>
                           </div>
                         )}
-                        {post.platform === 'Facebook' && (
+                        {post.platform === 'facebook' && (
                           <div className="h-8 w-8 bg-blue-500 rounded flex items-center justify-center">
                             <span className="text-white text-xs font-bold">f</span>
                           </div>
                         )}
-                        {post.platform === 'Twitter' && (
+                        {post.platform === 'twitter' && (
                           <div className="h-8 w-8 bg-sky-400 rounded flex items-center justify-center">
                             <span className="text-white text-xs font-bold">𝕏</span>
                           </div>
                         )}
                       </div>
                       <div>
-                        <h4 className="text-lg font-medium text-gray-900">{post.platform}</h4>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          {post.status}
+                        <h4 className="text-lg font-medium text-gray-900 capitalize">{post.platform}</h4>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          AI Generated
                         </span>
                       </div>
                     </div>
@@ -455,7 +606,7 @@ This email was generated by JumpApp AI based on your meeting transcript.`;
                         Preview
                       </button>
                       <button className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700">
-                        Schedule Post
+                        Copy Content
                       </button>
                     </div>
                   </div>
@@ -464,10 +615,38 @@ This email was generated by JumpApp AI based on your meeting transcript.`;
                 <div className="px-6 py-4">
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-sm text-gray-900 whitespace-pre-wrap">{post.content}</p>
+                    {post.hashtags && post.hashtags.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {post.hashtags.map((hashtag, hashIndex) => (
+                          <span key={hashIndex} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            {hashtag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {post.engagement_hook && (
+                      <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-xs text-yellow-800">
+                          <strong>Engagement Hook:</strong> {post.engagement_hook}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
+
+            {aiSocialPosts.length > 0 && (
+              <div className="text-center">
+                <button
+                  onClick={generateAISocialPosts}
+                  disabled={aiLoading.social}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Regenerate All Posts
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

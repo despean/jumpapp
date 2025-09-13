@@ -2,13 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { meetings, transcripts } from '@/lib/db/schema';
+import { meetings, transcripts, users } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
@@ -16,7 +13,21 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const meetingId = params.id;
+    const { searchParams } = new URL(request.url);
+    const meetingId = searchParams.get('id');
+    
+    if (!meetingId) {
+      return NextResponse.json({ error: 'Meeting ID is required' }, { status: 400 });
+    }
+
+    // Get user from database
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, session.user.email)
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
 
     // Fetch the meeting with its transcript
     const meeting = await db.query.meetings.findFirst({
@@ -31,7 +42,7 @@ export async function GET(
     }
 
     // Verify the meeting belongs to the current user
-    if (meeting.userEmail !== session.user.email) {
+    if (meeting.userId !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
