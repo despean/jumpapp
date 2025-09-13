@@ -54,12 +54,12 @@ export interface RecallBotCreate {
   recording_config?: {
     transcript?: {
       provider: {
-        meeting_captions: Record<string, any>;
+        meeting_captions: Record<string, unknown>;
       };
     };
-    participant_events?: Record<string, any>;
-    video_mixed_mp4?: Record<string, any>;
-    meeting_metadata?: Record<string, any>;
+    participant_events?: Record<string, unknown>;
+    video_mixed_mp4?: Record<string, unknown>;
+    meeting_metadata?: Record<string, unknown>;
   };
 }
 
@@ -124,8 +124,10 @@ export class RecallAIService {
     try {
       console.log('🤖 Creating Recall.ai bot for:', config.meeting_url);
       
+      const { recording_config, meeting_url, ...configWithoutMeetingUrl } = config;
+      
       const requestBody = {
-        meeting_url: config.meeting_url,
+        meeting_url,
         bot_name: config.bot_name || 'JumpApp Meeting Bot',
         recording_config: {
           // Use meeting captions for real-time transcription
@@ -142,13 +144,10 @@ export class RecallAIService {
           meeting_metadata: {},
           // Note: Webhooks disabled for shared account - using polling instead
           // realtime_endpoints: [],
-          ...config.recording_config,
+          ...recording_config,
         },
-        ...config,
+        ...configWithoutMeetingUrl,
       };
-      
-      console.log('📤 Recall.ai request body:', JSON.stringify(requestBody, null, 2));
-      console.log('📤 Recall.ai headers:', this.headers);
       
       const response: AxiosResponse<RecallBot> = await axios.post(
         `${this.baseURL}/bot`,
@@ -222,7 +221,7 @@ export class RecallAIService {
       console.log('🗑️ Deleting bot from Recall.ai:', botId);
       console.warn('⚠️ This will permanently delete the bot from Recall.ai!');
       
-      const response = await axios.delete(
+      await axios.delete(
         `${this.baseURL}/bot/${botId}`,
         { headers: this.headers }
       );
@@ -253,8 +252,6 @@ export class RecallAIService {
    */
   async getBotTranscript(botId: string): Promise<RecallTranscript | null> {
     try {
-      console.log(`📝 Getting transcript for bot ${botId}...`);
-      
       // First, get the bot data which includes recordings
       const botResponse: AxiosResponse<RecallBot> = await axios.get(
         `${this.baseURL}/bot/${botId}`,
@@ -262,10 +259,9 @@ export class RecallAIService {
       );
 
       const bot = botResponse.data;
-      
+      console.log('🤖 Bot data:', bot);
       // Check if there are recordings
       if (!bot.recordings || bot.recordings.length === 0) {
-        console.log(`📝 No recordings found for bot ${botId}`);
         return null;
       }
 
@@ -275,17 +271,13 @@ export class RecallAIService {
       );
       
       if (!recording) {
-        console.log(`📝 No completed transcript found for bot ${botId}`);
         return null;
       }
 
       const transcriptData = recording.media_shortcuts?.transcript;
       if (!transcriptData?.data?.download_url) {
-        console.log(`📝 Transcript download URL not available for bot ${botId}`);
         return null;
       }
-
-      console.log(`📥 Downloading transcript from: ${transcriptData.data.download_url}`);
       
       // Fetch the actual transcript content
       const transcriptResponse = await axios.get(transcriptData.data.download_url, {
@@ -296,8 +288,8 @@ export class RecallAIService {
       
       // Parse the transcript data (format varies by provider)
       let transcriptText = '';
-      let words: any[] = [];
-      let speakers: any[] = [];
+      let words: Array<{ start_time: number; end_time: number; text: string }> = [];
+      let speakers: Array<{ id: string; name: string }> = [];
       
       if (typeof transcriptResponse.data === 'string') {
         transcriptText = transcriptResponse.data;
@@ -311,8 +303,6 @@ export class RecallAIService {
         words = transcriptResponse.data.flatMap(segment => segment.words || []);
       }
       
-      console.log(`✅ Transcript retrieved: ${transcriptText.length} characters`);
-      
       // Return in our expected format
       return {
         id: recording.id,
@@ -323,16 +313,11 @@ export class RecallAIService {
         created_at: recording.created_at || new Date().toISOString(),
       };
     } catch (error) {
-      console.error(`❌ Failed to get transcript for bot ${botId}:`, error);
-      if (axios.isAxiosError(error)) {
-        console.error('❌ Response status:', error.response?.status);
-        console.error('❌ Response data:', error.response?.data);
-        
-        if (error.response?.status === 404) {
-          // Transcript not ready yet
-          return null;
-        }
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        // Transcript not ready yet
+        return null;
       }
+      console.error(`❌ Failed to get transcript for bot ${botId}:`, error);
       throw error;
     }
   }
@@ -361,78 +346,57 @@ export class RecallAIService {
   /**
    * Check if a bot has finished recording and has transcript available
    */
-  async isBotReady(botId: string): Promise<{ isReady: boolean; hasTranscript: boolean; status: string; debug?: any }> {
+  async isBotReady(botId: string): Promise<{ isReady: boolean; hasTranscript: boolean; status: string }> {
     try {
       const bot = await this.getBot(botId);
       
+      // Get the actual status from status_changes array (latest entry)
+      const latestStatusChange = bot.status_changes?.[bot.status_changes.length - 1];
+      const actualStatus = latestStatusChange?.code || bot.status;
+      
       // Bot is ready when it has finished the call
-      const isReady = bot.status === 'call_ended' || bot.status === 'done';
+      const isReady = actualStatus === 'call_ended' || actualStatus === 'done';
       
       // Check if transcript is available
       let hasTranscript = false;
-      let debugInfo: any = {
-        botStatus: bot.status,
-        recordingsCount: bot.recordings?.length || 0,
-        recordings: []
-      };
 
       if (isReady && bot.recordings && bot.recordings.length > 0) {
-        // Log detailed recording information for debugging
+        // Check for transcript availability in recordings
         for (const recording of bot.recordings) {
-          const recordingDebug = {
-            id: recording.id,
-            status: recording.status,
-            hasMediaShortcuts: !!recording.media_shortcuts,
-            transcriptInfo: recording.media_shortcuts?.transcript
-          };
-          debugInfo.recordings.push(recordingDebug);
-          
-          // Check multiple conditions for transcript availability
           const transcriptData = recording.media_shortcuts?.transcript;
           
           if (transcriptData) {
             // Method 1: Check if transcript status is 'done'
             if (transcriptData.status?.code === 'done') {
               hasTranscript = true;
-              console.log(`✅ Transcript ready via status check for bot ${botId}`);
               break;
             }
             
             // Method 2: Check if download_url exists (indicates transcript is ready)
             if (transcriptData.data?.download_url) {
               hasTranscript = true;
-              console.log(`✅ Transcript ready via download_url for bot ${botId}`);
               break;
             }
           }
         }
         
-        // Method 3: If bot status is 'done' and we have recordings, assume transcript will be ready
-        // This is more aggressive but matches the Recall.ai documentation behavior
-        if (bot.status === 'done' && !hasTranscript) {
-          console.log(`🔄 Bot ${botId} is 'done' but transcript not detected yet, trying to fetch...`);
-          
-          // Try to actually fetch the transcript to see if it's available
+        // Method 3: If bot is ready but transcript not detected in recordings, try direct fetch
+        if (!hasTranscript) {
           try {
             const transcript = await this.getBotTranscript(botId);
-            if (transcript && transcript.transcript_text) {
+            if (transcript && transcript.transcript_text && transcript.transcript_text.length > 0) {
               hasTranscript = true;
-              console.log(`✅ Transcript confirmed available via direct fetch for bot ${botId}`);
             }
-          } catch (fetchError) {
-            console.log(`⏳ Transcript not yet available for bot ${botId}:`, fetchError);
+          } catch {
+            // Transcript not available yet
           }
         }
       }
       
-      console.log(`🔍 Bot ${botId} final result: status="${bot.status}", ready=${isReady}, hasTranscript=${hasTranscript}`);
-      console.log(`📊 Debug info for bot ${botId}:`, JSON.stringify(debugInfo, null, 2));
-      
       return {
         isReady,
         hasTranscript,
-        status: bot.status,
-        debug: debugInfo
+        status: actualStatus
       };
     } catch (error) {
       console.error(`❌ Failed to check if bot ${botId} is ready:`, error);
@@ -461,23 +425,16 @@ export class RecallAIService {
     while (attempts < maxAttempts) {
       try {
         const { isReady, hasTranscript, status } = await this.isBotReady(botId);
-        console.log(`📊 Bot ${botId} status: ${status} (attempt ${attempts + 1}/${maxAttempts})`);
 
         if (status === 'error') {
-          console.log('❌ Bot encountered an error');
           return null;
         }
 
-        if (isReady) {
-          if (hasTranscript) {
-            // Bot finished and transcript is ready
-            const transcript = await this.getBotTranscript(botId);
-            if (transcript) {
-              console.log('✅ Transcript ready for bot:', botId);
-              return transcript;
-            }
+        if (isReady && hasTranscript) {
+          const transcript = await this.getBotTranscript(botId);
+          if (transcript) {
+            return transcript;
           }
-          console.log('⏳ Bot finished but transcript still processing, continuing to poll...');
         }
 
         // Wait before next poll
@@ -556,7 +513,7 @@ export class RecallAIService {
       }
       
       return meetingUrl;
-    } catch (error) {
+    } catch {
       console.warn('⚠️ Could not parse meeting URL, using as-is:', meetingUrl);
       return meetingUrl;
     }

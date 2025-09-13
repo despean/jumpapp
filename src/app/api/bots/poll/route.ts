@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { RecallAIService } from '@/lib/recall-ai';
@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { eq, and, isNotNull } from 'drizzle-orm';
 import { meetings, transcripts, users } from '@/lib/db/schema';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const session = await getServerSession(authOptions);
     
@@ -50,19 +50,12 @@ export async function POST(request: NextRequest) {
         let transcriptSaved = false;
 
         // Check if bot finished and transcript is available
-        const { isReady, hasTranscript, status, debug } = await recallService.isBotReady(meeting.botId);
+        const { isReady, hasTranscript } = await recallService.isBotReady(meeting.botId);
         
-        console.log(`🔍 Bot ${meeting.botId} readiness check:`, { isReady, hasTranscript, status });
-        if (debug) {
-          console.log(`📊 Debug info for bot ${meeting.botId}:`, JSON.stringify(debug, null, 2));
-        }
-
-        // Set transcript ready based on enhanced detection
+        // Set transcript ready based on detection
         transcriptReady = hasTranscript;
         
         if (isReady) {
-          console.log(`✅ Bot ${meeting.botId} finished with status: ${status}`);
-
           // Update meeting status if it changed
           if (meeting.status !== 'completed') {
             await db.update(meetings)
@@ -84,8 +77,6 @@ export async function POST(request: NextRequest) {
               const recallTranscript = await recallService.getBotTranscript(meeting.botId);
               
               if (recallTranscript) {
-                console.log(`💾 Saving transcript for meeting: ${meeting.title}`);
-                
                 // Extract attendee information
                 const attendees = recallTranscript.speakers.map(speaker => ({
                   id: speaker.id,
@@ -93,9 +84,13 @@ export async function POST(request: NextRequest) {
                 }));
 
                 // Calculate duration
-                const duration = recallTranscript.words.length > 0 
-                  ? Math.round(recallTranscript.words[recallTranscript.words.length - 1].end_time / 60)
-                  : 0;
+                let duration = 0;
+                if (recallTranscript.words && recallTranscript.words.length > 0) {
+                  const lastWord = recallTranscript.words[recallTranscript.words.length - 1];
+                  if (lastWord && typeof lastWord.end_time === 'number' && !isNaN(lastWord.end_time)) {
+                    duration = Math.round(lastWord.end_time / 60);
+                  }
+                }
 
                 // Save transcript to database
                 await db.insert(transcripts).values({
@@ -107,15 +102,12 @@ export async function POST(request: NextRequest) {
                 });
 
                 transcriptSaved = true;
-
-                console.log(`✅ Transcript saved for meeting: ${meeting.title}`);
               }
-            } catch (error) {
-              console.log(`⏳ Transcript not ready yet for bot ${meeting.botId}:`, error.message);
+            } catch {
+              // Transcript not ready yet
             }
           } else if (existingTranscript) {
             transcriptSaved = true;
-            console.log(`📝 Transcript already exists for meeting: ${meeting.title}`);
           }
 
           // Update meeting status if transcript is ready
@@ -147,7 +139,7 @@ export async function POST(request: NextRequest) {
           meetingId: meeting.id,
           meetingTitle: meeting.title,
           botId: meeting.botId,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }

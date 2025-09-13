@@ -67,8 +67,6 @@ export class BotPollingService {
    */
   private async pollActiveBots(): Promise<void> {
     try {
-      console.log('🔍 Polling active bots...');
-
       // Get all meetings with active bots (including completed ones without transcripts)
       const activeMeetings = await db.query.meetings.findMany({
         where: and(
@@ -77,11 +75,7 @@ export class BotPollingService {
         )
       });
 
-      console.log(`📊 Query found ${activeMeetings.length} meetings with bots:`, 
-        activeMeetings.map(m => ({ id: m.id, title: m.title, status: m.status, botId: m.botId })));
-
       if (activeMeetings.length === 0) {
-        console.log('📊 No active bots to poll');
         return;
       }
 
@@ -97,15 +91,10 @@ export class BotPollingService {
         
         if (!existingTranscript) {
           meetingsNeedingPoll.push(meeting);
-        } else {
-          console.log(`📝 Meeting "${meeting.title}" already has transcript, skipping`);
         }
       }
 
-      console.log(`📊 Found ${meetingsNeedingPoll.length} meetings needing polling (${activeMeetings.length - meetingsNeedingPoll.length} already have transcripts)`);
-
       if (meetingsNeedingPoll.length === 0) {
-        console.log('📊 No meetings need polling');
         return;
       }
 
@@ -113,9 +102,10 @@ export class BotPollingService {
       const results = [];
 
       for (const meeting of meetingsNeedingPoll) {
+        if (!meeting.botId) continue; // Skip meetings without bot IDs
+        
         try {
-          console.log(`🤖 Polling bot ${meeting.botId} for meeting: "${meeting.title}"`);
-          const result = await this.pollSingleBot(recallService, meeting);
+          const result = await this.pollSingleBot(recallService, meeting as { id: string; botId: string; status: string; title: string });
           results.push(result);
         } catch (error) {
           console.error(`❌ Error polling bot ${meeting.botId}:`, error);
@@ -128,13 +118,6 @@ export class BotPollingService {
         }
       }
 
-      // Log summary
-      const completed = results.filter(r => r.status === 'completed').length;
-      const processing = results.filter(r => r.status === 'processing').length;
-      const errors = results.filter(r => r.status === 'error').length;
-
-      console.log(`📊 Polling summary: ${completed} completed, ${processing} processing, ${errors} errors`);
-
     } catch (error) {
       console.error('❌ Error in bot polling service:', error);
     }
@@ -145,20 +128,14 @@ export class BotPollingService {
    */
   private async pollSingleBot(
     recallService: RecallAIService, 
-    meeting: any
+    meeting: { id: string; botId: string; status: string; title: string }
   ): Promise<{ meetingId: string; botId: string; status: string; transcriptSaved?: boolean }> {
     
-    console.log(`🔍 Checking bot ${meeting.botId} status...`);
-
     // Check bot status and transcript availability
     const { isReady, hasTranscript, status } = await recallService.isBotReady(meeting.botId);
     
-    console.log(`📊 Bot ${meeting.botId} results: status="${status}", isReady=${isReady}, hasTranscript=${hasTranscript}`);
-    
     // Update meeting status if bot finished
     if (isReady && meeting.status !== 'completed') {
-      console.log(`✅ Bot ${meeting.botId} finished, updating meeting status`);
-      
       await db.update(meetings)
         .set({
           status: 'completed',
@@ -175,22 +152,37 @@ export class BotPollingService {
       });
 
       if (!existingTranscript) {
-        console.log(`📝 New transcript available for bot ${meeting.botId}, saving...`);
-        
         try {
           const recallTranscript = await recallService.getBotTranscript(meeting.botId);
           
           if (recallTranscript) {
+            console.log(`📝 Processing transcript for bot ${meeting.botId}:`, {
+              hasWords: !!recallTranscript.words,
+              wordsCount: recallTranscript.words?.length || 0,
+              hasSpeakers: !!recallTranscript.speakers,
+              speakersCount: recallTranscript.speakers?.length || 0,
+              contentLength: recallTranscript.transcript_text?.length || 0
+            });
+
             // Extract attendee information
-            const attendees = recallTranscript.speakers.map(speaker => ({
+            const attendees = recallTranscript.speakers?.map(speaker => ({
               id: speaker.id,
               name: speaker.name,
-            }));
+            })) || [];
 
             // Calculate duration from transcript words
-            const duration = recallTranscript.words.length > 0 
-              ? Math.round(recallTranscript.words[recallTranscript.words.length - 1].end_time / 60)
-              : 0;
+            let duration = 0;
+            if (recallTranscript.words && recallTranscript.words.length > 0) {
+              const lastWord = recallTranscript.words[recallTranscript.words.length - 1];
+              if (lastWord && typeof lastWord.end_time === 'number' && !isNaN(lastWord.end_time)) {
+                duration = Math.round(lastWord.end_time / 60);
+                console.log(`⏱️ Calculated duration: ${duration} minutes from end_time: ${lastWord.end_time}`);
+              } else {
+                console.log(`⚠️ Invalid end_time in last word:`, lastWord);
+              }
+            } else {
+              console.log(`⚠️ No words found in transcript for duration calculation`);
+            }
 
             // Save transcript to database
             await db.insert(transcripts).values({
@@ -202,8 +194,6 @@ export class BotPollingService {
               processedAt: new Date(),
             });
 
-            console.log(`✅ Transcript saved for meeting: ${meeting.title}`);
-            
             return {
               meetingId: meeting.id,
               botId: meeting.botId,
@@ -214,8 +204,6 @@ export class BotPollingService {
         } catch (error) {
           console.error(`❌ Error saving transcript for bot ${meeting.botId}:`, error);
         }
-      } else {
-        console.log(`📝 Transcript already exists for meeting: ${meeting.title}`);
       }
     }
 
