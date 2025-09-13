@@ -5,6 +5,7 @@ import { CalendarIcon, CogIcon, DocumentTextIcon } from '@heroicons/react/24/out
 import Link from 'next/link';
 import { UpcomingMeetings } from '@/components/UpcomingMeetings';
 import PollingStatus from '@/components/PollingStatus';
+import UserProfileDropdown from '@/components/UserProfileDropdown';
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -95,39 +96,12 @@ export default function Home() {
                 Past Meetings
               </Link>
               <Link
-                href="/test-auth"
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Test Auth
-              </Link>
-              <Link
-                href="/test-bots"
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Test Bots
-              </Link>
-              <Link
                 href="/test-polling"
                 className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
               >
                 Test Polling
               </Link>
-              <Link
-                href="/settings"
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Settings
-              </Link>
-              <div className="flex items-center space-x-2">
-                <img
-                  className="h-8 w-8 rounded-full"
-                  src={session.user?.image || ''}
-                  alt={session.user?.name || ''}
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  {session.user?.name}
-                </span>
-              </div>
+              <UserProfileDropdown />
             </div>
           </div>
         </div>
