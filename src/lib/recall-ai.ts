@@ -361,7 +361,7 @@ export class RecallAIService {
   /**
    * Check if a bot has finished recording and has transcript available
    */
-  async isBotReady(botId: string): Promise<{ isReady: boolean; hasTranscript: boolean; status: string }> {
+  async isBotReady(botId: string): Promise<{ isReady: boolean; hasTranscript: boolean; status: string; debug?: any }> {
     try {
       const bot = await this.getBot(botId);
       
@@ -370,18 +370,69 @@ export class RecallAIService {
       
       // Check if transcript is available
       let hasTranscript = false;
+      let debugInfo: any = {
+        botStatus: bot.status,
+        recordingsCount: bot.recordings?.length || 0,
+        recordings: []
+      };
+
       if (isReady && bot.recordings && bot.recordings.length > 0) {
-        hasTranscript = bot.recordings.some(recording => 
-          recording.media_shortcuts?.transcript?.status?.code === 'done'
-        );
+        // Log detailed recording information for debugging
+        for (const recording of bot.recordings) {
+          const recordingDebug = {
+            id: recording.id,
+            status: recording.status,
+            hasMediaShortcuts: !!recording.media_shortcuts,
+            transcriptInfo: recording.media_shortcuts?.transcript
+          };
+          debugInfo.recordings.push(recordingDebug);
+          
+          // Check multiple conditions for transcript availability
+          const transcriptData = recording.media_shortcuts?.transcript;
+          
+          if (transcriptData) {
+            // Method 1: Check if transcript status is 'done'
+            if (transcriptData.status?.code === 'done') {
+              hasTranscript = true;
+              console.log(`✅ Transcript ready via status check for bot ${botId}`);
+              break;
+            }
+            
+            // Method 2: Check if download_url exists (indicates transcript is ready)
+            if (transcriptData.data?.download_url) {
+              hasTranscript = true;
+              console.log(`✅ Transcript ready via download_url for bot ${botId}`);
+              break;
+            }
+          }
+        }
+        
+        // Method 3: If bot status is 'done' and we have recordings, assume transcript will be ready
+        // This is more aggressive but matches the Recall.ai documentation behavior
+        if (bot.status === 'done' && !hasTranscript) {
+          console.log(`🔄 Bot ${botId} is 'done' but transcript not detected yet, trying to fetch...`);
+          
+          // Try to actually fetch the transcript to see if it's available
+          try {
+            const transcript = await this.getBotTranscript(botId);
+            if (transcript && transcript.transcript_text) {
+              hasTranscript = true;
+              console.log(`✅ Transcript confirmed available via direct fetch for bot ${botId}`);
+            }
+          } catch (fetchError) {
+            console.log(`⏳ Transcript not yet available for bot ${botId}:`, fetchError);
+          }
+        }
       }
       
-      console.log(`🔍 Bot ${botId} status: ${bot.status}, ready: ${isReady}, has transcript: ${hasTranscript}`);
+      console.log(`🔍 Bot ${botId} final result: status="${bot.status}", ready=${isReady}, hasTranscript=${hasTranscript}`);
+      console.log(`📊 Debug info for bot ${botId}:`, JSON.stringify(debugInfo, null, 2));
       
       return {
         isReady,
         hasTranscript,
-        status: bot.status
+        status: bot.status,
+        debug: debugInfo
       };
     } catch (error) {
       console.error(`❌ Failed to check if bot ${botId} is ready:`, error);

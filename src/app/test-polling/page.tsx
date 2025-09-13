@@ -141,15 +141,30 @@ export default function TestPollingPage() {
   const testBotStatus = async (botId: string) => {
     try {
       addLog(`Testing bot status for ${botId}...`);
-      const response = await fetch(`/api/bots/${botId}`);
-      const data = await response.json();
       
-      if (response.ok) {
-        addLog(`Bot ${botId}: Status=${data.status}, HasTranscript=${data.hasTranscript}`);
-        addLog(`Bot details: ${JSON.stringify(data, null, 2)}`);
-      } else {
-        addLog(`Bot ${botId} error: ${data.error}`);
+      // Test both the regular endpoint and the debug endpoint
+      const [regularResponse, debugResponse] = await Promise.all([
+        fetch(`/api/bots/${botId}`),
+        fetch(`/api/debug/bot/${botId}`)
+      ]);
+      
+      if (regularResponse.ok) {
+        const regularData = await regularResponse.json();
+        addLog(`Regular API - Status: ${regularData.status}, HasTranscript: ${regularData.hasTranscript}`);
       }
+      
+      if (debugResponse.ok) {
+        const debugData = await debugResponse.json();
+        addLog(`Debug API - Bot Status: ${debugData.rawBot.status}`);
+        addLog(`Debug API - Readiness: ${JSON.stringify(debugData.readinessCheck)}`);
+        addLog(`Debug API - Transcript Available: ${debugData.transcript.available}`);
+        addLog(`Debug API - Analysis: ${JSON.stringify(debugData.analysis)}`);
+        
+        if (debugData.transcript.error) {
+          addLog(`Transcript Error: ${debugData.transcript.error}`);
+        }
+      }
+      
     } catch (err) {
       addLog(`Bot ${botId} failed: ${err}`);
     }
