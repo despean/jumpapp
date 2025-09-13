@@ -19,6 +19,7 @@ interface Meeting {
   title: string;
   botId: string | null;
   status: string;
+  transcript?: any;
 }
 
 export default function TestPollingPage() {
@@ -30,6 +31,7 @@ export default function TestPollingPage() {
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [meetingsDebug, setMeetingsDebug] = useState<any>(null);
+  const [transcriptDebug, setTranscriptDebug] = useState<any>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -131,13 +133,41 @@ export default function TestPollingPage() {
       
       if (response.ok) {
         setActiveMeetings(data.meetings || []);
-        const withTranscripts = data.meetings?.filter(m => m.transcript) || [];
+        const withTranscripts = data.meetings?.filter((m: Meeting) => m.transcript) || [];
         addLog(`Found ${data.meetings?.length || 0} meetings, ${withTranscripts.length} with transcripts`);
       } else {
         setError(`Error fetching meetings: ${data.error}`);
       }
     } catch (err) {
       setError('Failed to fetch meetings');
+    }
+  };
+
+  // Debug transcript data for a specific bot
+  const debugTranscriptData = async (botId: string) => {
+    try {
+      setLoading(true);
+      addLog(`Debugging transcript data for bot ${botId.substring(0, 8)}...`);
+      
+      const response = await fetch(`/api/debug/transcript-data?botId=${botId}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setTranscriptDebug(data);
+        addLog(`Debug complete - DB transcript: ${data.databaseTranscript.exists ? 'EXISTS' : 'MISSING'}`);
+        addLog(`Recall transcript: ${data.recallTranscript ? 'AVAILABLE' : 'NOT_AVAILABLE'}`);
+        if (data.recallTranscript) {
+          addLog(`Content length: ${data.recallTranscript.contentLength} chars`);
+        }
+      } else {
+        setError(`Debug error: ${data.error}`);
+        addLog(`Debug failed: ${data.error}`);
+      }
+    } catch (err) {
+      setError('Failed to debug transcript data');
+      addLog(`Debug failed: ${err}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -283,6 +313,9 @@ export default function TestPollingPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Transcript
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Debug
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -307,12 +340,23 @@ export default function TestPollingPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          (meeting as any).transcript 
+                          meeting.transcript 
                             ? 'bg-green-100 text-green-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {(meeting as any).transcript ? 'Available' : 'Processing'}
+                          {meeting.transcript ? 'Available' : 'Processing'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {meeting.botId && (
+                          <button
+                            onClick={() => debugTranscriptData(meeting.botId!)}
+                            disabled={loading}
+                            className="text-xs px-2 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
+                          >
+                            Debug
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -375,6 +419,69 @@ export default function TestPollingPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Transcript Debug Results */}
+        {transcriptDebug && (
+          <div className="mt-6 bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Transcript Debug Results</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Database Status */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Database Status</h3>
+                <div className="bg-gray-50 p-4 rounded">
+                  <p><strong>Transcript Exists:</strong> {transcriptDebug.databaseTranscript.exists ? 'Yes' : 'No'}</p>
+                  <p><strong>Content Length:</strong> {transcriptDebug.databaseTranscript.contentLength} chars</p>
+                  <p><strong>Duration:</strong> {transcriptDebug.databaseTranscript.duration || 'N/A'} minutes</p>
+                  <p><strong>Attendees:</strong> {transcriptDebug.databaseTranscript.attendees || 'N/A'}</p>
+                </div>
+              </div>
+
+              {/* Recall.ai Status */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Recall.ai Status</h3>
+                <div className="bg-gray-50 p-4 rounded">
+                  <p><strong>Bot Status:</strong> {transcriptDebug.recallBotData.status || 'Unknown'}</p>
+                  <p><strong>Is Ready:</strong> {transcriptDebug.recallReadiness.isReady ? 'Yes' : 'No'}</p>
+                  <p><strong>Has Transcript:</strong> {transcriptDebug.recallReadiness.hasTranscript ? 'Yes' : 'No'}</p>
+                  <p><strong>Recordings:</strong> {transcriptDebug.recallBotData.recordings.length}</p>
+                </div>
+              </div>
+
+              {/* Transcript Content */}
+              {transcriptDebug.recallTranscript && (
+                <div className="md:col-span-2">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Transcript Content</h3>
+                  <div className="bg-gray-50 p-4 rounded">
+                    <p><strong>Content Length:</strong> {transcriptDebug.recallTranscript.contentLength} chars</p>
+                    <p><strong>Words Count:</strong> {transcriptDebug.recallTranscript.wordsCount}</p>
+                    <p><strong>Speakers Count:</strong> {transcriptDebug.recallTranscript.speakersCount}</p>
+                    {transcriptDebug.recallTranscript.sampleContent && (
+                      <div className="mt-2">
+                        <p><strong>Sample Content:</strong></p>
+                        <div className="bg-white p-2 rounded border text-sm font-mono">
+                          {transcriptDebug.recallTranscript.sampleContent}...
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Raw Debug Data */}
+              <div className="md:col-span-2">
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-sm font-medium text-gray-600 hover:text-gray-900">
+                    Show Raw Debug Data
+                  </summary>
+                  <pre className="mt-2 bg-gray-900 text-green-400 p-4 rounded text-xs overflow-auto max-h-96">
+                    {JSON.stringify(transcriptDebug, null, 2)}
+                  </pre>
+                </details>
+              </div>
             </div>
           </div>
         )}
