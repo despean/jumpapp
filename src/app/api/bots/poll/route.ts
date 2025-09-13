@@ -50,7 +50,15 @@ export async function POST(request: NextRequest) {
         let transcriptSaved = false;
 
         // Check if bot finished and transcript is available
-        const { isReady, hasTranscript, status } = await recallService.isBotReady(meeting.botId);
+        const { isReady, hasTranscript, status, debug } = await recallService.isBotReady(meeting.botId);
+        
+        console.log(`🔍 Bot ${meeting.botId} readiness check:`, { isReady, hasTranscript, status });
+        if (debug) {
+          console.log(`📊 Debug info for bot ${meeting.botId}:`, JSON.stringify(debug, null, 2));
+        }
+
+        // Set transcript ready based on enhanced detection
+        transcriptReady = hasTranscript;
         
         if (isReady) {
           console.log(`✅ Bot ${meeting.botId} finished with status: ${status}`);
@@ -99,16 +107,15 @@ export async function POST(request: NextRequest) {
                 });
 
                 transcriptSaved = true;
-                transcriptReady = true;
 
                 console.log(`✅ Transcript saved for meeting: ${meeting.title}`);
               }
             } catch (error) {
               console.log(`⏳ Transcript not ready yet for bot ${meeting.botId}:`, error.message);
             }
-          } else {
-            transcriptReady = true;
+          } else if (existingTranscript) {
             transcriptSaved = true;
+            console.log(`📝 Transcript already exists for meeting: ${meeting.title}`);
           }
 
           // Update meeting status if transcript is ready
