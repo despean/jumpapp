@@ -157,7 +157,7 @@ export default function SettingsPage() {
   const connectSocialAccount = async (platform: 'linkedin' | 'facebook') => {
     // Check if OAuth is configured
     if (!isOAuthConfigured(platform)) {
-      alert(`${platform.charAt(0).toUpperCase() + platform.slice(1)} OAuth is not yet configured. Please follow the setup guide in SOCIAL_MEDIA_SETUP.md to add your OAuth credentials to the environment variables.`);
+      alert(`${platform.charAt(0).toUpperCase() + platform.slice(1)} OAuth is not yet configured.`);
       return;
     }
 

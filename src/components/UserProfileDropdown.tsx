@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { ChevronDownIcon, UserIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, CogIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, CogIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 export default function UserProfileDropdown() {
@@ -76,15 +76,6 @@ export default function UserProfileDropdown() {
 
           {/* Menu Items */}
           <div className="py-1">
-            <Link
-              href="/profile"
-              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              onClick={() => setIsOpen(false)}
-            >
-              <UserIcon className="h-4 w-4 mr-3 text-gray-400" />
-              Profile
-            </Link>
-            
             <Link
               href="/automations"
               className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
